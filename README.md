@@ -146,4 +146,4 @@ import { createStationClient, createStationClientFromEnv } from "@rivi-software/
 const client = createStationClientFromEnv();
 ```
 
-Examples for reads, realtime and playback ingest are in [`packages/sdk-typescript/README.md`](packages/sdk-typescript/README.md).
+Examples for content filters and slugs, realtime, draft preview and playback ingest are in [`packages/sdk-typescript/README.md`](packages/sdk-typescript/README.md).

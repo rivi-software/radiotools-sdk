@@ -3,8 +3,23 @@ scalar JSON
   type Query {
     station: Station!
     schemas(type: String, version: Int): [ContentSchema!]!
-    content(type: String!, cursor: ID, limit: Int = 25): ContentCollection!
+    """
+    Published records of one type, newest first by default. publishedAt orders by first
+    publication, updatedAt by the live version's publication; pass nextCursor to continue.
+    """
+    content(
+      type: String!
+      cursor: ID
+      limit: Int = 25
+      sort: ContentSort = publishedAt
+      direction: SortDirection = desc
+      filter: [ContentFilter!]
+    ): ContentCollection!
     contentRecord(id: ID!): PublishedRecord!
+    """
+    The record a slug names; a slug it used before resolves to the record as it is now.
+    """
+    contentBySlug(type: String!, slug: String!): PublishedRecord!
     schedule(fromDate: String!, throughDate: String!): Schedule!
     programs(fromDate: String!, throughDate: String!): Programs!
     currentBroadcast: CurrentBroadcast!
@@ -25,8 +40,39 @@ scalar JSON
     name: String!
     timezone: String!
     publishingLanguage: String!
+    """
+    Present once the station has saved a profile.
+    """
+    profile: StationProfile
     resources: StationResources!
     delivery: StationDelivery!
+  }
+
+  type StationProfile {
+    tagline: String
+    description: String
+    """
+    How listeners tune in, for example "FM 105.3 · DAB+ 8A".
+    """
+    frequencyLabel: String
+    websiteUrl: String
+    streamUrl: String
+    contactEmail: String
+    phone: String
+    address: StationAddress
+    social: [StationSocialLink!]!
+  }
+
+  type StationAddress {
+    street: String
+    postalCode: String
+    city: String
+    country: String
+  }
+
+  type StationSocialLink {
+    network: String!
+    url: String!
   }
 
   type StationResources {
@@ -37,10 +83,18 @@ scalar JSON
     broadcast: String
     nowPlaying: String
     trackHistory: String
-    socket: String
+    """
+    The WebSocket carrying the station's public feed rows; null while offline or switched off.
+    """
+    realtime: StationRealtime
     weather: String
     traffic: String
     media: String!
+  }
+
+  type StationRealtime {
+    url: String!
+    channel: String!
   }
 
   type StationDelivery {
@@ -57,21 +111,57 @@ scalar JSON
     fields: JSON!
   }
 
+  enum ContentSort {
+    publishedAt
+    updatedAt
+  }
+
+  enum SortDirection {
+    asc
+    desc
+  }
+
+  enum ContentFilterOp {
+    eq
+    contains
+    anyOf
+  }
+
+  """
+  eq and contains take value; anyOf takes values. Text and choice delivery fields only.
+  """
+  input ContentFilter {
+    field: String!
+    op: ContentFilterOp = eq
+    value: String
+    values: [String!]
+  }
+
   type ContentCollection {
     records: [PublishedRecord!]!
     nextCursor: ID
   }
 
   type PublishedRecord {
+    contractVersion: Int!
     id: ID!
     publicationId: ID!
     revision: Int!
     type: String!
     schemaVersion: Int!
     publishedAt: String!
+    firstPublishedAt: String!
     values: JSON!
     document: JSON!
     media: [PublicMedia!]!
+    """
+    Planning programmes a published programs/presenters profile belongs to; null for other types.
+    """
+    related: PublishedRelated
+  }
+
+  type PublishedRelated {
+    programIds: [ID!]!
   }
 
   type PublicMedia {
@@ -81,6 +171,18 @@ scalar JSON
     url: String!
     credits: String!
     mime: String!
+    alt: String!
+    width: Int
+    height: Int
+    duration: Float
+    variants: PublicMediaVariants!
+  }
+
+  type PublicMediaVariants {
+    thumb: String
+    display: String
+    card: String
+    square: String
   }
 
   type Schedule {
@@ -103,6 +205,22 @@ scalar JSON
     id: ID!
     title: String!
     profileId: ID
+    presenters: [BroadcastPresenter!]!
+    slots: [ProgramSlot!]!
+  }
+
+  """
+  A regular slot: weekday 0 = Sunday … 6 = Saturday, startTime is wall time in timezone.
+  """
+  type ProgramSlot {
+    weekday: Int!
+    startTime: String!
+    durationMinutes: Int!
+    timezone: String!
+    intervalWeeks: Int!
+    fromDate: String!
+    throughDate: String!
+    presenters: [BroadcastPresenter!]!
   }
 
   type CurrentBroadcast {
@@ -171,6 +289,8 @@ scalar JSON
     status: String!
     cancellationReason: String!
     repeatOfId: ID
+    "live, prerecorded or repeat"
+    nature: String!
     program: BroadcastProgram!
     presenters: [BroadcastPresenter!]!
   }

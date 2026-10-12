@@ -59,11 +59,15 @@ class RadioToolsStationClient:
         raise NotImplementedError("Use the TypeScript SDK or extend this stub with REST href resolution.")
 
     def get_content(self, **params: Any) -> dict[str, Any]:
-        """Paginated published content records."""
+        """Paginated published content records, newest first; sort, direction and filters."""
         raise NotImplementedError("Use the TypeScript SDK or extend this stub with REST href resolution.")
 
     def get_content_record(self, **params: Any) -> dict[str, Any]:
         """One published content record by id."""
+        raise NotImplementedError("Use the TypeScript SDK or extend this stub with REST href resolution.")
+
+    def get_content_by_slug(self, **params: Any) -> dict[str, Any]:
+        """One published content record by type and slug; former slugs also resolve."""
         raise NotImplementedError("Use the TypeScript SDK or extend this stub with REST href resolution.")
 
     def get_schedule(self, **params: Any) -> dict[str, Any]:

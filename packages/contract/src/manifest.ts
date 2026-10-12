@@ -110,7 +110,7 @@ export const listenerSdkManifest: SdkManifest = {
     {
       name: "getContent",
       scope: "listener:read",
-      description: "Paginated published content records.",
+      description: "Paginated published content records, newest first; sort, direction and filters.",
       graphqlField: "content",
       rest: { method: "GET", pathPattern: "{resources.content}", resourceKey: "content" },
     },
@@ -120,6 +120,17 @@ export const listenerSdkManifest: SdkManifest = {
       description: "One published content record by id.",
       graphqlField: "contentRecord",
       rest: { method: "GET", pathPattern: "{resources.content}/{id}", resourceKey: "content" },
+    },
+    {
+      name: "getContentBySlug",
+      scope: "listener:read",
+      description: "One published content record by type and slug; former slugs also resolve.",
+      graphqlField: "contentBySlug",
+      rest: {
+        method: "GET",
+        pathPattern: "{resources.content}/{type}/by-slug/{slug}",
+        resourceKey: "content",
+      },
     },
     {
       name: "getSchedule",
@@ -194,7 +205,7 @@ export const listenerSdkManifest: SdkManifest = {
     {
       name: "subscribe",
       scope: "listener:read",
-      description: "Public WebSocket subscription (server adapter required for Authorization).",
+      description: "Anonymous public feed WebSocket from station.resources.realtime; reconnects.",
     },
   ],
   integrations: {

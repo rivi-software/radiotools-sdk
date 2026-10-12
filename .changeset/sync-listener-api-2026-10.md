@@ -1,0 +1,26 @@
+---
+"@rivi-software/radiotools-contract": minor
+"@rivi-software/radiotools-sdk": minor
+"@rivi-software/radiotools-sdk-generator": minor
+---
+
+Sync with the current RadioTools listener API.
+
+**Breaking**
+
+- `station.resources.socket` is replaced by `station.resources.realtime` (`{ url, channel }`, or `null` when realtime is off). `subscribe` now follows the station's anonymous public feed WebSocket: it starts from the current state, reconnects with backoff, and no longer sends the listener token or needs an authenticated socket adapter. `createSocket` takes only the URL, and the `window` argument is gone (the feed covers today through seven days later).
+- `subscribePublicSocket` is replaced by `subscribePublicFeed({ realtime, stationId, handlers })`, which also works in browsers. `PublicSocketHandlers` and `PublicSocketSubscription` remain as deprecated aliases.
+- Content cursors (`nextCursor`) are opaque strings instead of UUIDs.
+
+**Added**
+
+- `getContent` takes `sort` (`publishedAt` | `updatedAt`), `direction` and structured filters (`eq`, `contains`, `anyOf`); filters now also work over GraphQL.
+- `getContentBySlug(type, slug)`; former slugs resolve to the current record.
+- `readPreviewHandoff` reads the draft preview form that Studio's "Open on website" posts.
+- Schemas: station `profile`; record `firstPublishedAt` and `related.programIds`; media `alt`, dimensions and `variants` (`thumb`, `display`, `card`, `square`); programme `presenters` and `slots`; broadcast `nature`; traffic incident `cause` and `closure`; multi-select choice fields (`multiple`); inline links and list blocks in editorial documents; the `MODULE_DISABLED` error code and richer error issues.
+- `publicMediaUrl` accepts the `card` and `square` variants.
+
+**Fixed**
+
+- Station, content, schema and traffic responses from the current API no longer fail validation.
+- The generated OpenAPI document lists `getContent` (it was overwritten by `getContentRecord`) and uses the real `now-playing`, `track-history` and `broadcast/current` paths.

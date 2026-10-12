@@ -63,3 +63,33 @@ export async function previewEditorial(
     retries: options.retries,
   });
 }
+
+export type PreviewHandoff = { grant: string; input: SdkPreviewInput };
+
+/**
+ * Read the fields Studio's "Open on website" button POSTs to the station site's preview route:
+ * `grant`, `stationId`, `recordId`, `revision` and `audience`. Accepts the parsed form body
+ * (`await request.formData()`), URL search params or a plain object. Pass the result to
+ * `previewEditorial`; the grant covers one revision and audience and expires after 15 minutes.
+ */
+export function readPreviewHandoff(
+  fields: FormData | URLSearchParams | Record<string, unknown>,
+): PreviewHandoff {
+  const read = (name: string): unknown =>
+    fields instanceof FormData || fields instanceof URLSearchParams
+      ? fields.get(name)
+      : fields[name];
+  const grantField = read("grant");
+  const grant = typeof grantField === "string" ? grantField.trim() : "";
+  if (!grant) throw new Error("Preview handoff is missing the grant");
+  const revisionField = read("revision");
+  const revision =
+    typeof revisionField === "number" ? revisionField : Number.parseInt(String(revisionField), 10);
+  const input = sdkSchemas.PreviewInput.parse({
+    stationId: read("stationId"),
+    recordId: read("recordId"),
+    revision,
+    audience: read("audience"),
+  });
+  return { grant, input };
+}

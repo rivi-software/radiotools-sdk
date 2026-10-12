@@ -98,8 +98,22 @@ function renderOpenApi(): string {
     {
       getContent: [
         { name: "type", required: true, schema: { type: "string" } },
-        { name: "cursor", schema: { type: "string", format: "uuid" } },
+        { name: "cursor", schema: { type: "string", maxLength: 400 } },
         { name: "limit", schema: { type: "integer", minimum: 1, maximum: 50, default: 25 } },
+        {
+          name: "sort",
+          schema: { type: "string", enum: ["publishedAt", "updatedAt"], default: "publishedAt" },
+        },
+        { name: "direction", schema: { type: "string", enum: ["asc", "desc"], default: "desc" } },
+        {
+          name: "filter",
+          schema: {
+            type: "array",
+            maxItems: 10,
+            items: { type: "string" },
+            description: "field:value, field.contains:value or field.anyOf:a,b (repeatable)",
+          },
+        },
       ],
       getSchedule: [
         { name: "fromDate", required: true, schema: { type: "string", format: "date" } },
@@ -115,16 +129,21 @@ function renderOpenApi(): string {
       ],
     };
 
+  // Resource hrefs the server publishes under /api/v1/stations/{stationSlug}.
+  const resourcePaths: Record<string, string> = {
+    broadcast: "broadcast/current",
+    nowPlaying: "now-playing",
+    trackHistory: "track-history",
+  };
+  // Record reads are emitted with getContent below.
+  const contentRecordReads = new Set(["getContentRecord", "getContentBySlug"]);
+
   for (const method of manifest.clientMethods) {
     if (!method.rest || method.rest.method !== "GET" || !method.rest.resourceKey) continue;
-    if (method.name === "getStation") continue;
+    if (method.name === "getStation" || contentRecordReads.has(method.name)) continue;
 
-    const pathKey =
-      method.rest.resourceKey === "content"
-        ? `/api/v1/stations/{stationSlug}/content`
-        : method.rest.resourceKey === "schemas"
-          ? `/api/v1/stations/{stationSlug}/schemas`
-          : `/api/v1/stations/{stationSlug}/${method.rest.resourceKey}`;
+    const resourceKey = method.rest.resourceKey;
+    const pathKey = `/api/v1/stations/{stationSlug}/${resourcePaths[resourceKey] ?? resourceKey}`;
 
     const extraParams = queryParamsByOperation[method.name] ?? [];
     paths[pathKey] = {
@@ -163,6 +182,23 @@ function renderOpenApi(): string {
           ],
           responses: {
             "200": successResponse("getContentRecord"),
+            "404": { description: "Not found", content: errorResponseContent() },
+          },
+        },
+      };
+      paths[`/api/v1/stations/{stationSlug}/content/{type}/by-slug/{slug}`] = {
+        get: {
+          operationId: "getContentBySlug",
+          summary: "One published content record by type and slug; former slugs also resolve",
+          tags: ["listener"],
+          security: [{ bearerListener: [] }],
+          parameters: [
+            { name: "stationSlug", in: "path", required: true, schema: { type: "string" } },
+            { name: "type", in: "path", required: true, schema: { type: "string" } },
+            { name: "slug", in: "path", required: true, schema: { type: "string" } },
+          ],
+          responses: {
+            "200": successResponse("getContentBySlug"),
             "404": { description: "Not found", content: errorResponseContent() },
           },
         },

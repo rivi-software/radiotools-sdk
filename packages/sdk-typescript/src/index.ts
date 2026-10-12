@@ -1,4 +1,5 @@
 export {
+  type ContentFilter,
   type ContentListOptions,
   type CreateStationClientOptions,
   createStationClient,
@@ -12,13 +13,23 @@ export { createStationClientFromEnv, type RadioToolsEnv, stationClientOptionsFro
 export { type EtagCache, type FetchLike, RadioToolsApiError, createEtagCache } from "./http";
 export { type PublicMediaVariant, publicMediaUrl } from "./media";
 export { type ReportPlaybackOptions, reportPlayback } from "./playback";
-export { type PreviewEditorialOptions, previewEditorial } from "./preview";
 export {
+  type PreviewEditorialOptions,
+  type PreviewHandoff,
+  previewEditorial,
+  readPreviewHandoff,
+} from "./preview";
+export {
+  type PublicFeedHandlers,
+  type PublicFeedSubscription,
   type PublicSocketHandlers,
   type PublicSocketSubscription,
-  subscribePublicSocket,
+  type SubscribePublicFeedOptions,
+  secureFeedUrl,
+  subscribePublicFeed,
 } from "./realtime";
 export {
+  isSafeHref,
   LISTENER_CONTRACT_VERSION,
   PUBLIC_SOCKET_PROTOCOL,
   type SdkErrorCode,
@@ -27,13 +38,17 @@ export {
   type SdkPlaybackObservationResult,
   type SdkPreviewInput,
   type SdkPublicCurrentBroadcast,
+  type SdkPublicMedia,
   type SdkPublicNowPlaying,
   type SdkPublicOnAir,
   type SdkPublicPrograms,
+  type SdkPublicProgramSlot,
+  type SdkPublicRealtimeDescriptor,
   type SdkPublicSchedule,
   type SdkPublicSchemaList,
   type SdkPublicSocketEvent,
   type SdkPublicStation,
+  type SdkPublicStationProfile,
   type SdkPublicTrackHistory,
   type SdkPublishedCollection,
   type SdkPublishedRecord,
