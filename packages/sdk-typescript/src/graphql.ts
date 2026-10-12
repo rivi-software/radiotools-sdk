@@ -60,8 +60,38 @@ const broadcastFields = `
   status
   cancellationReason
   repeatOfId
+  nature
   program { id title profileId }
   presenters { id title }
+`;
+
+const mediaFields = `
+  assetId
+  versionId
+  kind
+  url
+  credits
+  mime
+  alt
+  width
+  height
+  duration
+  variants { thumb display card square }
+`;
+
+const recordFields = `
+  contractVersion
+  id
+  publicationId
+  revision
+  type
+  schemaVersion
+  publishedAt
+  firstPublishedAt
+  values
+  document
+  media { ${mediaFields} }
+  related { programIds }
 `;
 
 export const stationQuery = /* GraphQL */ `
@@ -73,6 +103,17 @@ export const stationQuery = /* GraphQL */ `
       name
       timezone
       publishingLanguage
+      profile {
+        tagline
+        description
+        frequencyLabel
+        websiteUrl
+        streamUrl
+        contactEmail
+        phone
+        address { street postalCode city country }
+        social { network url }
+      }
       resources {
         schemas
         content
@@ -81,7 +122,7 @@ export const stationQuery = /* GraphQL */ `
         broadcast
         nowPlaying
         trackHistory
-        socket
+        realtime { url channel }
         weather
         traffic
         media
@@ -98,37 +139,37 @@ export const schemasQuery = /* GraphQL */ `
 `;
 
 export const contentQuery = /* GraphQL */ `
-  query SdkContent($type: String!, $cursor: ID, $limit: Int) {
-    content(type: $type, cursor: $cursor, limit: $limit) {
+  query SdkContent(
+    $type: String!
+    $cursor: ID
+    $limit: Int
+    $sort: ContentSort
+    $direction: SortDirection
+    $filter: [ContentFilter!]
+  ) {
+    content(
+      type: $type
+      cursor: $cursor
+      limit: $limit
+      sort: $sort
+      direction: $direction
+      filter: $filter
+    ) {
       nextCursor
-      records {
-        id
-        publicationId
-        revision
-        type
-        schemaVersion
-        publishedAt
-        values
-        document
-        media { assetId versionId kind url credits mime }
-      }
+      records { ${recordFields} }
     }
   }
 `;
 
 export const contentRecordQuery = /* GraphQL */ `
   query SdkContentRecord($id: ID!) {
-    contentRecord(id: $id) {
-      id
-      publicationId
-      revision
-      type
-      schemaVersion
-      publishedAt
-      values
-      document
-      media { assetId versionId kind url credits mime }
-    }
+    contentRecord(id: $id) { ${recordFields} }
+  }
+`;
+
+export const contentBySlugQuery = /* GraphQL */ `
+  query SdkContentBySlug($type: String!, $slug: String!) {
+    contentBySlug(type: $type, slug: $slug) { ${recordFields} }
   }
 `;
 
@@ -195,7 +236,22 @@ export const programsQuery = /* GraphQL */ `
       fromDate
       throughDate
       truncated
-      programs { id title profileId }
+      programs {
+        id
+        title
+        profileId
+        presenters { id title }
+        slots {
+          weekday
+          startTime
+          durationMinutes
+          timezone
+          intervalWeeks
+          fromDate
+          throughDate
+          presenters { id title }
+        }
+      }
     }
   }
 `;
@@ -231,13 +287,24 @@ export const previewMutation = /* GraphQL */ `
       schemaVersion
       values
       document
-      media { assetId versionId kind url credits mime }
+      media { ${mediaFields} }
     }
   }
 `;
 
+/** GraphQL returns `null` for fields the REST contract omits; drop them before parsing. */
+function omitNull(value: unknown, key: string): unknown {
+  if (!value || typeof value !== "object") return value;
+  const { [key]: field, ...rest } = value as Record<string, unknown>;
+  return field == null ? rest : value;
+}
+
 export function parseGraphqlStation(data: { station: unknown }) {
-  return sdkSchemas.PublicStation.parse(data.station);
+  return sdkSchemas.PublicStation.parse(omitNull(data.station, "profile"));
+}
+
+export function parseGraphqlRecord(record: unknown) {
+  return sdkSchemas.PublishedRecord.parse(omitNull(record, "related"));
 }
 
 export function parseGraphqlSchemas(data: { schemas: unknown[] }) {
@@ -253,10 +320,7 @@ export function parseGraphqlContent(
   return sdkSchemas.PublishedCollection.parse({
     contractVersion: 1,
     type,
-    records: data.content.records.map((record) => ({
-      contractVersion: 1,
-      ...(record as object),
-    })),
+    records: data.content.records.map(parseGraphqlRecord),
     nextCursor,
     page: { limit, nextCursor },
   });

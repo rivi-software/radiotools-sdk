@@ -2,8 +2,9 @@ import { expect, test } from "bun:test";
 import { createStationClient } from "../src/client";
 import { createEtagCache } from "../src/http";
 import { stationClientOptionsFromEnv } from "../src/env";
+import { readPreviewHandoff } from "../src/preview";
 import { PUBLIC_SOCKET_PROTOCOL, sdkSchemas } from "../src/schemas";
-import { subscribePublicSocket } from "../src/realtime";
+import { subscribePublicFeed } from "../src/realtime";
 
 const stationBody = {
   contractVersion: 1,
@@ -20,7 +21,10 @@ const stationBody = {
     broadcast: "/api/v1/stations/station-a/broadcast/current",
     nowPlaying: "/api/v1/stations/station-a/now-playing",
     trackHistory: "/api/v1/stations/station-a/track-history",
-    socket: "/api/v1/stations/station-a/socket",
+    realtime: {
+      url: "wss://radio.example/api/v1/realtime/stations/station-a/feed",
+      channel: "databases.station.tables.public_station_feed.rows",
+    },
     weather: null,
     traffic: null,
     media: "/api/media/public/station-a",
@@ -183,63 +187,387 @@ test("schedule windows stay within 31 inclusive days", async () => {
   ).rejects.toThrow(/31 inclusive days/);
 });
 
-test("public socket frames parse and preview frames are ignored", () => {
-  const schedule = {
-    protocol: PUBLIC_SOCKET_PROTOCOL,
-    type: "schedule",
-    stationId: "station-a",
-    data: {
-      contractVersion: 1,
-      timezone: "Europe/Amsterdam",
-      broadcasts: [],
-      truncated: false,
-    },
-  };
-  expect(sdkSchemas.PublicSocketEvent.parse(schedule).type).toBe("schedule");
+const feedChannel = "databases.station.tables.public_station_feed.rows";
+const scheduleEvent = {
+  protocol: PUBLIC_SOCKET_PROTOCOL,
+  type: "schedule",
+  stationId: "station-a",
+  data: {
+    contractVersion: 1,
+    timezone: "Europe/Amsterdam",
+    broadcasts: [],
+    truncated: false,
+  },
+};
 
-  class MockSocket {
-    static instances: MockSocket[] = [];
-    url = "";
-    listeners: Record<string, ((event: { data: string }) => void)[]> = {};
-    constructor(url: string) {
-      this.url = url;
-      MockSocket.instances.push(this);
-    }
-    addEventListener(type: string, listener: (event: { data: string }) => void) {
-      this.listeners[type] = [...(this.listeners[type] ?? []), listener];
-    }
-    close() {}
-    emit(data: string) {
-      for (const listener of this.listeners.message ?? []) listener({ data });
-    }
+class MockSocket {
+  static instances: MockSocket[] = [];
+  url = "";
+  closed = false;
+  listeners: Record<string, ((event: { data: string }) => void)[]> = {};
+  constructor(url: string) {
+    this.url = url;
+    MockSocket.instances.push(this);
   }
+  addEventListener(type: string, listener: (event: { data: string }) => void) {
+    this.listeners[type] = [...(this.listeners[type] ?? []), listener];
+  }
+  close() {
+    this.closed = true;
+  }
+  fire(type: string, data = "") {
+    for (const listener of this.listeners[type] ?? []) listener({ data });
+  }
+  row(action: "create" | "update" | "delete", payload: Record<string, unknown>) {
+    this.fire(
+      "message",
+      JSON.stringify({
+        type: "event",
+        data: {
+          events: [`${feedChannel}.${payload.kind}/${payload.entry}.${action}`],
+          channels: [feedChannel],
+          timestamp: "2026-10-12T10:00:00.000Z",
+          payload,
+        },
+      }),
+    );
+  }
+}
 
+test("public feed rows dispatch events, tombstones and ignore other stations", () => {
+  expect(sdkSchemas.PublicSocketEvent.parse(scheduleEvent).type).toBe("schedule");
+  MockSocket.instances = [];
   let scheduleCount = 0;
-  subscribePublicSocket({
-    socketUrl: "/api/v1/stations/station-a/socket",
-    radioToolsOrigin: "https://radio.example",
-    handlers: { onSchedule: () => scheduleCount++ },
-    apiToken: "fixture-api-token",
-    createSocket: (url, headers) => {
-      expect(headers.authorization).toBe("Bearer fixture-api-token");
-      expect(url.startsWith("wss://radio.example/")).toBe(true);
-      expect(url.includes("token=")).toBe(false);
-      return new MockSocket(url) as unknown as WebSocket;
+  const removed: string[] = [];
+  const subscription = subscribePublicFeed({
+    realtime: { url: stationBody.resources.realtime.url, channel: feedChannel },
+    stationId: "station-a",
+    handlers: {
+      onSchedule: () => scheduleCount++,
+      onContent: (recordId, data) => {
+        if (data === null) removed.push(recordId);
+      },
     },
+    createSocket: (url) => new MockSocket(url) as unknown as WebSocket,
   });
-
   const socket = MockSocket.instances[0];
   if (!socket) throw new Error("socket was not created");
-  socket.emit(
-    JSON.stringify({
-      protocol: PUBLIC_SOCKET_PROTOCOL,
-      type: "preview",
-      stationId: "station-a",
-      data: { id: "00000000-0000-4000-8000-000000000002" },
-    }),
-  );
-  socket.emit(JSON.stringify(schedule));
+  expect(socket.url).toBe(stationBody.resources.realtime.url);
+
+  const row = { station_id: "station-a", kind: "schedule", entry: "current" };
+  socket.row("create", { ...row, data_json: JSON.stringify(scheduleEvent) });
+  socket.row("update", { ...row, station_id: "station-b", data_json: JSON.stringify(scheduleEvent) });
+  socket.row("update", {
+    ...row,
+    data_json: JSON.stringify({ ...scheduleEvent, type: "preview", data: {} }),
+  });
+  socket.fire("message", "pong");
+  socket.row("delete", {
+    station_id: "station-a",
+    kind: "content",
+    entry: "00000000-0000-4000-8000-000000000003",
+  });
   expect(scheduleCount).toBe(1);
+  expect(removed).toEqual(["00000000-0000-4000-8000-000000000003"]);
+
+  subscription.close();
+  expect(socket.closed).toBe(true);
+});
+
+test("public feed reconnects after the socket closes", async () => {
+  MockSocket.instances = [];
+  const subscription = subscribePublicFeed({
+    realtime: { url: "ws://localhost:5173/api/v1/realtime/stations/station-a/feed", channel: feedChannel },
+    stationId: "station-a",
+    handlers: {},
+    createSocket: (url) => new MockSocket(url) as unknown as WebSocket,
+  });
+  const original = setTimeout;
+  const delays: number[] = [];
+  globalThis.setTimeout = ((handler: () => void, delay?: number) => {
+    delays.push(delay ?? 0);
+    handler();
+    return 0;
+  }) as typeof setTimeout;
+  try {
+    MockSocket.instances[0]?.fire("close");
+  } finally {
+    globalThis.setTimeout = original;
+  }
+  expect(delays).toEqual([1_000]);
+  expect(MockSocket.instances).toHaveLength(2);
+  subscription.close();
+  MockSocket.instances[1]?.fire("close");
+  expect(MockSocket.instances).toHaveLength(2);
+});
+
+test("public feed refuses an insecure socket URL", () => {
+  expect(() =>
+    subscribePublicFeed({
+      realtime: { url: "ws://radio.example/api/v1/realtime/stations/station-a/feed", channel: feedChannel },
+      stationId: "station-a",
+      handlers: {},
+      createSocket: () => {
+        throw new Error("must not connect");
+      },
+    }),
+  ).toThrow(/secure URL/);
+});
+
+test("subscribe opens the station's realtime feed without sending the token", async () => {
+  MockSocket.instances = [];
+  const client = createStationClient({
+    baseUrl: "https://radio.example",
+    stationSlug: "station-a",
+    apiToken: "fixture-api-token",
+    fetch: async () => Response.json(stationBody),
+    createSocket: (url) => new MockSocket(url) as unknown as WebSocket,
+  });
+  let scheduleCount = 0;
+  const subscription = client.subscribe({ onSchedule: () => scheduleCount++ });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const socket = MockSocket.instances[0];
+  if (!socket) throw new Error("socket was not created");
+  expect(socket.url.includes("token")).toBe(false);
+  socket.row("create", {
+    station_id: "station-a",
+    kind: "schedule",
+    entry: "current",
+    data_json: JSON.stringify(scheduleEvent),
+  });
+  expect(scheduleCount).toBe(1);
+  subscription.close();
+});
+
+test("subscribe reports a station without realtime", async () => {
+  const client = createStationClient({
+    baseUrl: "https://radio.example",
+    stationSlug: "station-a",
+    apiToken: "fixture-api-token",
+    fetch: async () =>
+      Response.json({ ...stationBody, resources: { ...stationBody.resources, realtime: null } }),
+  });
+  const error = await new Promise<unknown>((resolve) => {
+    client.subscribe({ onError: resolve });
+  });
+  expect(String(error)).toMatch(/realtime is unavailable/);
+});
+
+const recordBody = {
+  contractVersion: 1,
+  id: "00000000-0000-4000-8000-000000000010",
+  publicationId: "00000000-0000-4000-8000-000000000011",
+  revision: 2,
+  type: "news",
+  schemaVersion: 1,
+  publishedAt: "2026-10-10T10:00:00.000Z",
+  firstPublishedAt: "2026-10-09T10:00:00.000Z",
+  values: { slug: "storm-eunice" },
+  document: { version: 1, mode: "document", blocks: [] },
+  media: [
+    {
+      assetId: "00000000-0000-4000-8000-000000000012",
+      versionId: "00000000-0000-4000-8000-000000000013",
+      kind: "image",
+      url: "/api/media/public/station-a/00000000-0000-4000-8000-000000000013",
+      credits: "",
+      mime: "image/jpeg",
+    },
+  ],
+};
+
+test("getContent sends sort, direction and filters and accepts opaque cursors", async () => {
+  const urls: URL[] = [];
+  const client = createStationClient({
+    baseUrl: "https://radio.example",
+    stationSlug: "station-a",
+    apiToken: "fixture-api-token",
+    fetch: async (input) => {
+      const url = new URL(String(input));
+      urls.push(url);
+      if (url.pathname.endsWith("/stations/station-a")) return Response.json(stationBody);
+      return Response.json({
+        contractVersion: 1,
+        type: "news",
+        records: [recordBody],
+        nextCursor: "eyJwIjoiMjAyNi0xMC0wOSJ9",
+        page: { limit: 5, nextCursor: "eyJwIjoiMjAyNi0xMC0wOSJ9" },
+      });
+    },
+  });
+  const page = await client.getContent({
+    type: "news",
+    limit: 5,
+    sort: "updatedAt",
+    direction: "asc",
+    filter: [
+      "category:sport",
+      { field: "title", op: "contains", value: "storm" },
+      { field: "regions", op: "anyOf", values: ["noord", "zuid"] },
+    ],
+  });
+  expect(page.nextCursor).toBe("eyJwIjoiMjAyNi0xMC0wOSJ9");
+  const media = page.records[0]?.media[0];
+  expect(media?.alt).toBe("");
+  expect(media?.variants).toEqual({ thumb: null, display: null, card: null, square: null });
+  const params = urls[1]?.searchParams;
+  expect(params?.get("sort")).toBe("updatedAt");
+  expect(params?.get("direction")).toBe("asc");
+  expect(params?.getAll("filter")).toEqual([
+    "category:sport",
+    "title.contains:storm",
+    "regions.anyOf:noord,zuid",
+  ]);
+});
+
+test("GraphQL content sends structured filters", async () => {
+  const variables: Record<string, unknown>[] = [];
+  const client = createStationClient({
+    baseUrl: "https://radio.example",
+    stationSlug: "station-a",
+    apiToken: "fixture-api-token",
+    transport: "graphql",
+    fetch: async (_url, init) => {
+      const body = JSON.parse(String(init?.body)) as { variables?: Record<string, unknown> };
+      variables.push(body.variables ?? {});
+      if (variables.length === 1) {
+        return Response.json({ data: { station: { ...stationBody, profile: null } } });
+      }
+      return Response.json({
+        data: { content: { records: [{ ...recordBody, related: null }], nextCursor: null } },
+      });
+    },
+  });
+  const page = await client.getContent({
+    type: "news",
+    filter: ["regions.anyOf:noord,zuid", "title.contains:storm", "category:sport"],
+  });
+  expect(page.records[0]?.related).toBeUndefined();
+  expect(variables[1]?.filter).toEqual([
+    { field: "regions", op: "anyOf", values: ["noord", "zuid"] },
+    { field: "title", op: "contains", value: "storm" },
+    { field: "category", op: "eq", value: "sport" },
+  ]);
+});
+
+test("getContentBySlug reads the by-slug resource", async () => {
+  const paths: string[] = [];
+  const client = createStationClient({
+    baseUrl: "https://radio.example",
+    stationSlug: "station-a",
+    apiToken: "fixture-api-token",
+    fetch: async (input) => {
+      const url = new URL(String(input));
+      paths.push(url.pathname);
+      if (url.pathname.endsWith("/stations/station-a")) return Response.json(stationBody);
+      return Response.json({ ...recordBody, values: { slug: "storm-eunice-update" } });
+    },
+  });
+  const record = await client.getContentBySlug("news", "storm eunice");
+  expect(record.values.slug).toBe("storm-eunice-update");
+  expect(paths[1]).toBe("/api/v1/stations/station-a/content/news/by-slug/storm%20eunice");
+});
+
+test("station profile, programme slots and traffic causes parse", () => {
+  const station = sdkSchemas.PublicStation.parse({
+    ...stationBody,
+    profile: {
+      tagline: "De stem van de Liemers",
+      description: null,
+      frequencyLabel: "FM 105.3",
+      websiteUrl: "https://radio.example",
+      streamUrl: null,
+      contactEmail: "studio@radio.example",
+      phone: null,
+      address: null,
+      social: [{ network: "instagram", url: "https://instagram.com/radio" }],
+    },
+  });
+  expect(station.profile?.social[0]?.network).toBe("instagram");
+
+  const presenter = { id: "00000000-0000-4000-8000-000000000021", title: "Anna" };
+  const programs = sdkSchemas.PublicPrograms.parse({
+    contractVersion: 1,
+    timezone: "Europe/Amsterdam",
+    fromDate: "2026-10-12",
+    throughDate: "2026-10-18",
+    truncated: false,
+    programs: [
+      {
+        id: "00000000-0000-4000-8000-000000000020",
+        title: "Morning",
+        profileId: null,
+        presenters: [presenter],
+        slots: [
+          {
+            weekday: 6,
+            startTime: "10:00",
+            durationMinutes: 120,
+            timezone: "Europe/Amsterdam",
+            intervalWeeks: 1,
+            fromDate: "2026-01-01",
+            throughDate: "2026-12-31",
+            presenters: [presenter],
+          },
+        ],
+      },
+    ],
+  });
+  expect(programs.programs[0]?.slots[0]?.startTime).toBe("10:00");
+
+  const incident = sdkSchemas.TrafficPublic.parse({
+    contractVersion: 1,
+    stationId: "station-a",
+    snapshot: {
+      source: "anwb",
+      watch: { roads: [] },
+      freshness: {
+        status: "fresh",
+        thresholdSeconds: 300,
+        ageSeconds: 0,
+        fetchedAt: null,
+        observedAt: null,
+        lastError: null,
+      },
+      incidents: [
+        {
+          id: "i-1",
+          road: "A12",
+          type: "closure",
+          direction: "eastbound",
+          from: "Arnhem",
+          to: "Duiven",
+          lengthMeters: null,
+          delaySeconds: null,
+          cause: "accident",
+          closure: "exit",
+          summary: "Afrit dicht",
+          updatedAt: "2026-10-12T10:00:00.000Z",
+        },
+      ],
+      totals: { incidentCount: 1, jamDistanceMeters: 0, delaySeconds: 0 },
+    },
+  });
+  expect(incident.snapshot.incidents[0]?.cause).toBe("accident");
+});
+
+test("readPreviewHandoff reads Studio's form post", () => {
+  const form = new FormData();
+  form.set("grant", " grant-token ");
+  form.set("stationId", "station-a");
+  form.set("recordId", "00000000-0000-4000-8000-000000000010");
+  form.set("revision", "3");
+  form.set("audience", "website");
+  expect(readPreviewHandoff(form)).toEqual({
+    grant: "grant-token",
+    input: {
+      stationId: "station-a",
+      recordId: "00000000-0000-4000-8000-000000000010",
+      revision: 3,
+      audience: "website",
+    },
+  });
+  expect(() => readPreviewHandoff({ stationId: "station-a" })).toThrow(/grant/);
 });
 
 test("SDK sources do not import application server modules", async () => {

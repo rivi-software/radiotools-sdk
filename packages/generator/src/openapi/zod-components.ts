@@ -34,6 +34,7 @@ export const operationResponseSchemas: Record<
   getSchemas: { schema: "PublicSchemaList", description: "Content type schemas" },
   getContent: { schema: "PublishedCollection", description: "Published content page" },
   getContentRecord: { schema: "PublishedRecord", description: "One published record" },
+  getContentBySlug: { schema: "PublishedRecord", description: "One published record by slug" },
   getSchedule: { schema: "PublicSchedule", description: "Broadcast schedule" },
   getPrograms: { schema: "PublicPrograms", description: "Program summaries" },
   getCurrentBroadcast: { schema: "PublicCurrentBroadcast", description: "Current broadcast" },

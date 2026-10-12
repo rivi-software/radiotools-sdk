@@ -13,6 +13,7 @@ export const ErrorCode = z.enum([
   "FORBIDDEN",
   "VALIDATION_ERROR",
   "NOT_FOUND",
+  "MODULE_DISABLED",
   "METHOD_NOT_ALLOWED",
   "REVISION_CONFLICT",
   "IDEMPOTENCY_CONFLICT",
@@ -25,7 +26,20 @@ export const ErrorResponse = z.object({
     code: ErrorCode,
     message: z.string(),
     requestId: RequestId,
-    issues: z.array(z.object({ path: z.string(), message: z.string() })).optional(),
+    issues: z
+      .array(
+        z.object({
+          path: z.string(),
+          message: z.string(),
+          /** Stable reason for a known refusal (for example `slug.taken`), for localized copy. */
+          code: z.string().max(64).optional(),
+          /** A value the request could use instead (for example a free slug). */
+          suggestion: z.string().max(200).optional(),
+          /** Seconds until a refusal that waiting fixes may succeed. */
+          retryAfter: z.number().int().min(1).max(86_400).optional(),
+        }),
+      )
+      .optional(),
   }),
 });
 export const IngestErrorResponse = z.object({ error: z.string() });
@@ -46,6 +60,57 @@ export const Timezone = z
 
 const href = z.string().startsWith("/api/");
 
+/** Public links must be https: they are rendered on listener sites and in apps. */
+const HttpsUrl = z.url({ protocol: /^https$/, hostname: z.regexes.domain }).max(500);
+
+export const STATION_SOCIAL_NETWORKS = [
+  "facebook",
+  "instagram",
+  "x",
+  "tiktok",
+  "youtube",
+  "linkedin",
+  "mastodon",
+  "bluesky",
+  "whatsapp",
+  "other",
+] as const;
+
+export const StationSocialLink = z
+  .object({ network: z.enum(STATION_SOCIAL_NETWORKS), url: HttpsUrl })
+  .strict();
+
+export const StationAddress = z
+  .object({
+    street: z.string().max(120).nullable(),
+    postalCode: z.string().max(20).nullable(),
+    city: z.string().max(120).nullable(),
+    country: z.string().max(120).nullable(),
+  })
+  .strict();
+
+export const PublicStationProfile = z
+  .object({
+    /** One line under the station name. */
+    tagline: z.string().max(160).nullable(),
+    description: z.string().max(2000).nullable(),
+    /** How listeners tune in, for example "FM 105.3 · DAB+ 8A". */
+    frequencyLabel: z.string().max(80).nullable(),
+    websiteUrl: HttpsUrl.nullable(),
+    streamUrl: HttpsUrl.nullable(),
+    contactEmail: z.email().max(254).nullable(),
+    phone: z.string().max(40).nullable(),
+    address: StationAddress.nullable(),
+    social: z.array(StationSocialLink).max(12),
+  })
+  .strict();
+
+/** `station.resources.realtime`: the WebSocket that carries the station's public feed. */
+export const PublicRealtimeDescriptor = z.object({
+  url: z.url(),
+  channel: z.string().min(1),
+});
+
 export const PublicStation = z.object({
   contractVersion: ListenerContractVersion,
   id: z.string().min(1).max(80),
@@ -53,6 +118,8 @@ export const PublicStation = z.object({
   name: z.string().min(1).max(120),
   timezone: Timezone,
   publishingLanguage: z.string().min(2).max(35),
+  /** Present once the station has saved a profile. */
+  profile: PublicStationProfile.optional(),
   resources: z.object({
     schemas: href,
     content: href.nullable(),
@@ -61,7 +128,8 @@ export const PublicStation = z.object({
     broadcast: href.nullable(),
     nowPlaying: href.nullable(),
     trackHistory: href.nullable(),
-    socket: href.nullable(),
+    /** The public feed WebSocket; null while the station is offline or realtime is switched off. */
+    realtime: PublicRealtimeDescriptor.nullable(),
     weather: href.nullable(),
     traffic: href.nullable(),
     media: href,
@@ -118,6 +186,8 @@ export type DeliveryField = {
   min?: number;
   max?: number;
   choices?: { key: string; label: string }[];
+  /** A choices field that stores several keys (`string[]`); `maxItems` caps the selection. */
+  multiple?: boolean;
   targetType?: string;
   maxItems?: number;
   fields?: DeliveryField[];
@@ -134,6 +204,7 @@ function deliveryField(depth: number): z.ZodType<DeliveryField> {
       min: z.number().optional(),
       max: z.number().optional(),
       choices: z.array(z.object({ key: SchemaKey, label: z.string() })).optional(),
+      multiple: z.boolean().optional(),
       targetType: SchemaKey.optional(),
       maxItems: z.number().optional(),
       fields:
@@ -168,6 +239,28 @@ export const PublicSchemaList = z.object({
   types: z.array(PublicSchema).max(100),
 });
 
+/** Links are limited to web pages and mail addresses; renderers should re-check before use. */
+export function isSafeHref(href: string): boolean {
+  if (href.length > 2000 || /[\s<>"`\\]/.test(href)) return false;
+  if (/^mailto:[^@/?#]+@[^@/?#]+(\?.*)?$/i.test(href)) return true;
+  if (!/^https:\/\//i.test(href)) return false;
+  try {
+    const url = new URL(href);
+    return url.protocol === "https:" && Boolean(url.hostname) && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+const SpanLink = z
+  .object({
+    href: z
+      .string()
+      .max(2000)
+      .refine(isSafeHref, "Links must use https: or mailto:.")
+      .describe("Absolute https: URL or mailto: address."),
+    title: z.string().max(300).optional(),
+  })
+  .strict();
 const Span = z
   .object({
     text: z.string().max(20000),
@@ -175,6 +268,7 @@ const Span = z
       .array(z.enum(["bold", "italic", "underline", "strike"]))
       .max(4)
       .optional(),
+    link: SpanLink.optional(),
   })
   .strict();
 const inline = z.array(Span).max(1000);
@@ -194,6 +288,14 @@ const EditorialBlock = z.discriminatedUnion("type", [
       type: z.literal("quote"),
       content: inline,
       attribution: z.string().max(300),
+    })
+    .strict(),
+  z
+    .object({
+      id: z.uuid(),
+      type: z.literal("list"),
+      ordered: z.boolean(),
+      items: z.array(inline).min(1).max(50),
     })
     .strict(),
   z
@@ -264,6 +366,20 @@ export const EditorialDocument = z
     }
   });
 
+/**
+ * WebP renditions of a published image; `null` when the version has none. `card` (16:9) and
+ * `square` are cropped around the image's focal point.
+ */
+export const PublicMediaVariants = z.object({
+  thumb: z.string().nullable(),
+  display: z.string().nullable(),
+  card: z.string().nullable().default(null),
+  square: z.string().nullable().default(null),
+});
+/**
+ * A media reference frozen into a publication. `url` is the original; `variants` are smaller
+ * renditions for `srcset`. Older payloads lack `alt`, dimensions and variants, so they default.
+ */
 export const PublicMedia = z.object({
   assetId: z.uuid(),
   versionId: z.uuid(),
@@ -271,6 +387,11 @@ export const PublicMedia = z.object({
   url: z.string(),
   credits: z.string(),
   mime: z.string(),
+  alt: z.string().default(""),
+  width: z.number().nullable().default(null),
+  height: z.number().nullable().default(null),
+  duration: z.number().nullable().default(null),
+  variants: PublicMediaVariants.default({ thumb: null, display: null, card: null, square: null }),
 });
 export const PublishedRecord = z.object({
   contractVersion: ListenerContractVersion,
@@ -279,19 +400,28 @@ export const PublishedRecord = z.object({
   revision: z.number().int().positive(),
   type: SchemaKey,
   schemaVersion: z.number().int().positive(),
+  /** When this live version was published. */
   publishedAt: z.string(),
+  /** When the record first went public; corrections do not move it. */
+  firstPublishedAt: z.string().optional(),
   values: z.record(z.string(), JsonValue),
   document: EditorialDocument,
   media: z.array(PublicMedia).max(100),
+  /**
+   * Planning links of a published `programs` or `presenters` record: the programmes it is the
+   * profile of, or presents. Matches `program.id` in the public schedule and programmes.
+   */
+  related: z.object({ programIds: z.array(z.uuid()).max(50) }).optional(),
 });
 export const PublishedCollection = z.object({
   contractVersion: ListenerContractVersion,
   type: SchemaKey,
   records: z.array(PublishedRecord).max(50),
-  nextCursor: z.uuid().nullable(),
+  /** Opaque keyset cursor; pass it back as `cursor` for the next page. */
+  nextCursor: z.string().max(400).nullable(),
   page: z.object({
     limit: z.number().int().min(1).max(50),
-    nextCursor: z.uuid().nullable(),
+    nextCursor: z.string().max(400).nullable(),
   }),
 });
 export const PreviewInput = z
@@ -312,6 +442,8 @@ export const RevisionPreview = z.object({
 });
 
 const LocalDate = z.iso.date();
+/** How a broadcast reaches air: `live`, a `prerecorded` recording, or a `repeat` of `repeatOfId`. */
+export const BroadcastNature = z.enum(["live", "prerecorded", "repeat"]);
 export const PublicBroadcast = z.object({
   id: z.uuid(),
   title: z.string(),
@@ -323,6 +455,8 @@ export const PublicBroadcast = z.object({
   status: z.enum(["scheduled", "cancelled", "live", "completed"]),
   cancellationReason: z.string(),
   repeatOfId: z.uuid().nullable(),
+  /** `prerecorded` or `repeat` lets a listener app label the slot; `live` otherwise. */
+  nature: BroadcastNature.default("live"),
   program: z.object({ id: z.uuid(), title: z.string(), profileId: z.uuid().nullable() }),
   presenters: z.array(z.object({ id: z.uuid(), title: z.string() })),
 });
@@ -332,10 +466,29 @@ export const PublicSchedule = z.object({
   broadcasts: z.array(PublicBroadcast),
   truncated: z.boolean(),
 });
+const PublicPresenter = z.object({ id: z.uuid(), title: z.string() });
+/**
+ * A programme's regular slot: `weekday` is 0 = Sunday … 6 = Saturday, `startTime` is wall time in
+ * `timezone`. `fromDate`/`throughDate` bound the rule currently in force.
+ */
+export const PublicProgramSlot = z.object({
+  weekday: z.number().int().min(0).max(6),
+  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  durationMinutes: z.number().int().min(1).max(1440),
+  timezone: Timezone,
+  intervalWeeks: z.number().int().min(1).max(8),
+  fromDate: LocalDate,
+  throughDate: LocalDate,
+  presenters: z.array(PublicPresenter),
+});
 export const PublicProgram = z.object({
   id: z.uuid(),
   title: z.string(),
   profileId: z.uuid().nullable(),
+  /** Published presenter profiles of the programme and of its slots in the window. */
+  presenters: z.array(PublicPresenter),
+  /** Regular slots whose rule overlaps the requested window, Monday first. */
+  slots: z.array(PublicProgramSlot).max(100),
 });
 export const PublicPrograms = z.object({
   contractVersion: ListenerContractVersion,
@@ -606,6 +759,24 @@ const TrafficIncident = z
     to: z.string(),
     lengthMeters: z.number().int().nonnegative().nullable(),
     delaySeconds: z.number().int().nonnegative().nullable(),
+    /** Null when the provider text names no recognised cause. */
+    cause: z
+      .enum([
+        "accident",
+        "vehicle_fire",
+        "broken_down_vehicle",
+        "object_on_road",
+        "clearance_work",
+        "technical_problem",
+        "roadworks",
+        "closure",
+      ])
+      .nullable(),
+    /** What is closed, when the provider text says so; null otherwise. */
+    closure: z
+      .enum(["road", "entry", "exit", "entry_and_exit", "connector", "lane", "heavy_vehicles"])
+      .nullable(),
+    /** The provider's own text (Dutch). */
     summary: z.string(),
     updatedAt: z.string().datetime(),
   })
@@ -706,12 +877,16 @@ export const sdkSchemas = {
 export type SdkErrorResponse = z.infer<typeof ErrorResponse>;
 export type SdkErrorCode = z.infer<typeof ErrorCode>;
 export type SdkPublicStation = z.infer<typeof PublicStation>;
+export type SdkPublicStationProfile = z.infer<typeof PublicStationProfile>;
+export type SdkPublicRealtimeDescriptor = z.infer<typeof PublicRealtimeDescriptor>;
 export type SdkPublicSchema = z.infer<typeof PublicSchema>;
 export type SdkPublicSchemaList = z.infer<typeof PublicSchemaList>;
 export type SdkPublishedRecord = z.infer<typeof PublishedRecord>;
 export type SdkPublishedCollection = z.infer<typeof PublishedCollection>;
+export type SdkPublicMedia = z.infer<typeof PublicMedia>;
 export type SdkPublicSchedule = z.infer<typeof PublicSchedule>;
 export type SdkPublicPrograms = z.infer<typeof PublicPrograms>;
+export type SdkPublicProgramSlot = z.infer<typeof PublicProgramSlot>;
 export type SdkPublicCurrentBroadcast = z.infer<typeof PublicCurrentBroadcast>;
 export type SdkWeatherPublic = z.infer<typeof WeatherPublic>;
 export type SdkTrafficPublic = z.infer<typeof TrafficPublic>;

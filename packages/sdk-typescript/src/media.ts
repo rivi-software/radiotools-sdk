@@ -1,4 +1,5 @@
-export type PublicMediaVariant = "thumb" | "display";
+/** `thumb`/`display` are width-limited WebP renditions; `card` (16:9) and `square` are focal crops. */
+export type PublicMediaVariant = "thumb" | "display" | "card" | "square";
 
 /** Build a public media URL. RadioTools serves the bytes. The SDK does not download them. */
 export function publicMediaUrl(

@@ -1,4 +1,5 @@
 import {
+  contentBySlugQuery,
   contentQuery,
   contentRecordQuery,
   currentBroadcastQuery,
@@ -9,6 +10,7 @@ import {
   parseGraphqlCurrentBroadcast,
   parseGraphqlNowPlaying,
   parseGraphqlPrograms,
+  parseGraphqlRecord,
   parseGraphqlSchedule,
   parseGraphqlSchemas,
   parseGraphqlStation,
@@ -27,8 +29,8 @@ import type { EtagCache, FetchLike, PublicJsonRequestOptions } from "./http";
 import { readPublicJson } from "./http";
 import { reportPlayback } from "./playback";
 import { previewEditorial } from "./preview";
-import type { PublicSocketHandlers, PublicSocketSubscription } from "./realtime";
-import { type SubscribePublicSocketOptions, subscribePublicSocket } from "./realtime";
+import type { PublicFeedHandlers, PublicFeedSubscription } from "./realtime";
+import { type SubscribePublicFeedOptions, subscribePublicFeed } from "./realtime";
 import type {
   SdkPlaybackObservation,
   SdkPlaybackObservationResult,
@@ -57,7 +59,8 @@ export type CreateStationClientOptions = {
   apiToken?: string;
   /** Integration credential named `playback` with `ingest:write`. Required for `reportPlayback`. */
   ingestToken?: string;
-  createSocket?: SubscribePublicSocketOptions["createSocket"];
+  /** WebSocket factory for `subscribe` in runtimes without a global `WebSocket`. */
+  createSocket?: SubscribePublicFeedOptions["createSocket"];
   fetch?: FetchLike;
   etagCache?: EtagCache;
   /**
@@ -72,12 +75,56 @@ export type CreateStationClientOptions = {
   retries?: number;
 };
 
+/**
+ * A filter on a text or choice delivery field: `eq` (default) is an exact match, `contains` a
+ * case-insensitive substring, `anyOf` matches any of `values` (for multi-select choices, any of the
+ * record's keys). A string is the REST form: `field:value`, `field.contains:value` or
+ * `field.anyOf:a,b`.
+ */
+export type ContentFilter =
+  | string
+  | { field: string; op?: "eq" | "contains"; value: string }
+  | { field: string; op: "anyOf"; values: string[] };
+
 export type ContentListOptions = {
   type: string;
   cursor?: string;
   limit?: number;
-  filter?: string[];
+  /** `publishedAt` (default): first publication; `updatedAt`: the live version's publication. */
+  sort?: "publishedAt" | "updatedAt";
+  /** Defaults to `desc`, newest first. */
+  direction?: "asc" | "desc";
+  filter?: ContentFilter[];
 };
+
+type GraphqlContentFilter = {
+  field: string;
+  op: "eq" | "contains" | "anyOf";
+  value?: string;
+  values?: string[];
+};
+
+function graphqlContentFilter(filter: ContentFilter): GraphqlContentFilter {
+  if (typeof filter !== "string") {
+    return "values" in filter
+      ? { field: filter.field, op: "anyOf", values: filter.values }
+      : { field: filter.field, op: filter.op ?? "eq", value: filter.value };
+  }
+  const index = filter.indexOf(":");
+  const [field = "", op = "eq"] = filter.slice(0, Math.max(index, 0)).split(".");
+  const value = filter.slice(index + 1);
+  return op === "anyOf"
+    ? { field, op, values: value.split(",").filter(Boolean) }
+    : { field, op: op === "contains" ? "contains" : "eq", value };
+}
+
+function contentFilterParam(filter: ContentFilter): string {
+  if (typeof filter === "string") return filter;
+  if ("values" in filter) return `${filter.field}.anyOf:${filter.values.join(",")}`;
+  return filter.op === "contains"
+    ? `${filter.field}.contains:${filter.value}`
+    : `${filter.field}:${filter.value}`;
+}
 
 export type ScheduleWindow = {
   fromDate: string;
@@ -98,6 +145,11 @@ export type StationClient = {
   getSchemas: () => Promise<SdkPublicSchemaList>;
   getContent: (options: ContentListOptions) => Promise<SdkPublishedCollection>;
   getContentRecord: (id: string) => Promise<SdkPublishedRecord>;
+  /**
+   * The published record a slug names. A slug the record used before also resolves, so compare
+   * `record.values.slug` with the requested slug and redirect when they differ.
+   */
+  getContentBySlug: (type: string, slug: string) => Promise<SdkPublishedRecord>;
   iterateContent: (
     options: Omit<ContentListOptions, "cursor">,
   ) => AsyncGenerator<SdkPublishedRecord>;
@@ -118,10 +170,11 @@ export type StationClient = {
     observation: SdkPlaybackObservation,
     target?: ReportPlaybackTarget,
   ) => Promise<SdkPlaybackObservationResult>;
-  subscribe: (
-    handlers: PublicSocketHandlers,
-    window?: Partial<ScheduleWindow>,
-  ) => PublicSocketSubscription;
+  /**
+   * Follow the station's public feed over its WebSocket. The feed's schedule covers today through
+   * seven days later; handlers start from the current state and the socket reconnects until closed.
+   */
+  subscribe: (handlers: PublicFeedHandlers) => PublicFeedSubscription;
 };
 
 function absoluteUrl(baseUrl: string, path: string): string {
@@ -219,7 +272,10 @@ export function createStationClient(options: CreateStationClientOptions): Statio
     }, loadStationHttp);
   };
 
-  const stationFor = async (resource: keyof SdkPublicStation["resources"], name: string) => {
+  const stationFor = async (
+    resource: Exclude<keyof SdkPublicStation["resources"], "realtime">,
+    name: string,
+  ) => {
     const station = stationCache ?? (await getStation());
     return { station, href: requirePublicHref(station.resources[resource], name) };
   };
@@ -252,19 +308,6 @@ export function createStationClient(options: CreateStationClientOptions): Statio
   const getContent = async (list: ContentListOptions): Promise<SdkPublishedCollection> => {
     const { href } = await stationFor("content", "content");
     const limit = list.limit ?? 25;
-    const readHttp = async () => {
-      const params = new URLSearchParams({ type: list.type, limit: String(limit) });
-      if (list.cursor) params.set("cursor", list.cursor);
-      for (const filter of list.filter ?? []) params.append("filter", filter);
-      const { data } = await readPublicJson(
-        absoluteUrl(options.baseUrl, `${href}?${params}`),
-        sdkSchemas.PublishedCollection,
-        httpOptions,
-      );
-      return data;
-    };
-    // The public GraphQL content field has no filter argument.
-    if (list.filter?.length) return readHttp();
     return preferGraphql(
       async () => {
         const data = await graphqlRequest<{
@@ -272,12 +315,31 @@ export function createStationClient(options: CreateStationClientOptions): Statio
         }>(
           graphqlEndpoint,
           contentQuery,
-          { type: list.type, cursor: list.cursor, limit },
+          {
+            type: list.type,
+            cursor: list.cursor,
+            limit,
+            sort: list.sort,
+            direction: list.direction,
+            filter: list.filter?.map(graphqlContentFilter),
+          },
           httpOptions,
         );
         return parseGraphqlContent(list.type, data, limit);
       },
-      readHttp,
+      async () => {
+        const params = new URLSearchParams({ type: list.type, limit: String(limit) });
+        if (list.cursor) params.set("cursor", list.cursor);
+        if (list.sort) params.set("sort", list.sort);
+        if (list.direction) params.set("direction", list.direction);
+        for (const filter of list.filter ?? []) params.append("filter", contentFilterParam(filter));
+        const { data } = await readPublicJson(
+          absoluteUrl(options.baseUrl, `${href}?${params}`),
+          sdkSchemas.PublishedCollection,
+          httpOptions,
+        );
+        return data;
+      },
     );
   };
 
@@ -291,14 +353,35 @@ export function createStationClient(options: CreateStationClientOptions): Statio
           { id },
           httpOptions,
         );
-        return sdkSchemas.PublishedRecord.parse({
-          contractVersion: 1,
-          ...(data.contentRecord as object),
-        });
+        return parseGraphqlRecord(data.contentRecord);
       },
       async () => {
         const { data } = await readPublicJson(
           absoluteUrl(options.baseUrl, `${href}/${encodeURIComponent(id)}`),
+          sdkSchemas.PublishedRecord,
+          httpOptions,
+        );
+        return data;
+      },
+    );
+  };
+
+  const getContentBySlug = async (type: string, slug: string): Promise<SdkPublishedRecord> => {
+    const { href } = await stationFor("content", "content");
+    return preferGraphql(
+      async () => {
+        const data = await graphqlRequest<{ contentBySlug: unknown }>(
+          graphqlEndpoint,
+          contentBySlugQuery,
+          { type, slug },
+          httpOptions,
+        );
+        return parseGraphqlRecord(data.contentBySlug);
+      },
+      async () => {
+        const path = `${href}/${encodeURIComponent(type)}/by-slug/${encodeURIComponent(slug)}`;
+        const { data } = await readPublicJson(
+          absoluteUrl(options.baseUrl, path),
           sdkSchemas.PublishedRecord,
           httpOptions,
         );
@@ -514,6 +597,7 @@ export function createStationClient(options: CreateStationClientOptions): Statio
     getSchemas,
     getContent,
     getContentRecord,
+    getContentBySlug,
     iterateContent,
     getSchedule,
     getPrograms,
@@ -557,21 +641,20 @@ export function createStationClient(options: CreateStationClientOptions): Statio
         retries: options.retries,
       });
     },
-    subscribe: (handlers, window) => {
+    subscribe: (handlers) => {
       requireListenerToken();
-      let inner: PublicSocketSubscription | null = null;
+      let inner: PublicFeedSubscription | null = null;
       let closed = false;
       void getStation()
         .then((station) => {
           if (closed) return;
-          const socketUrl = requirePublicHref(station.resources.socket, "socket");
-          inner = subscribePublicSocket({
-            socketUrl,
-            apiToken: listenerToken,
+          if (!station.resources.realtime) {
+            throw new Error("Public realtime is unavailable for this station");
+          }
+          inner = subscribePublicFeed({
+            realtime: station.resources.realtime,
+            stationId: station.id,
             createSocket: options.createSocket,
-            radioToolsOrigin: options.baseUrl,
-            fromDate: window?.fromDate,
-            throughDate: window?.throughDate,
             handlers,
           });
         })
