@@ -12,7 +12,8 @@ concurrency:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    # Small SDK generation/typecheck/test workload: 2 vCPU / 8 GB, x64.
+    runs-on: depot-ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v5

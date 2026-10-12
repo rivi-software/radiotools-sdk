@@ -101,6 +101,14 @@ bash scripts/publish-npm-ordered.sh
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on pull requests and `main`: `generate`, typecheck, and tests.
 
+CI and the `prepare` jobs in both npm workflows use **`depot-ubuntu-24.04`** (x64, 2 vCPU, 8 GB RAM). These SDK jobs are small: the successful CI run [38193029375](https://github.com/rivi-software/radiotools-sdk/actions/runs/38193029375) completed its job in 19 seconds, including a 9-second typecheck, on GitHub's previous runner. Two CPUs are the initial cost-conscious choice; this is a baseline, not a measured Depot speedup. Ubuntu 24.04 and x64 keep the OS and native tool architecture consistent.
+
+The npm workflows generate, build, typecheck and test on Depot, then transfer prepared packages as a one-day artifact to their final `release` or `publish` job on **GitHub-hosted `ubuntu-24.04`**. The archive excludes `node_modules` and preserves file permissions. Only a successful preparation job permits publishing. The final jobs retain their npm authentication and OIDC permissions: [npm trusted publishing currently requires GitHub-hosted runners](https://docs.npmjs.com/trusted-publishers/). The automated release uses the prepared files directly rather than repeating generation and verification; local `bun run release-packages` still performs all checks.
+
+Before merging, an organization owner must [connect Depot's GitHub App](https://depot.dev/docs/github-actions/quickstart) to `rivi-software/radiotools-sdk` and approve repository access. For a public repository, its Actions runner group must also allow public repositories. Without this setup, Depot jobs remain queued. Runner labels are registered in [`.github/actionlint.yaml`](.github/actionlint.yaml) for workflow linting. GitHub-managed default CodeQL and Dependabot workflows are outside these repository workflow files.
+
+Tune each job using several comparable runs of the same commit: record queue time, execution time, peak CPU/memory and billed minutes in Depot. The [4 CPU / 16 GB runner costs twice the base runner rate](https://depot.dev/docs/github-actions/runner-types); choose it only if measured latency or memory needs justify the extra cost. A cost-neutral CPU upgrade needs at least a 50% reduction in execution time. No larger, Arm, macOS or Windows worker is needed for the current workloads.
+
 Generate one target:
 
 ```bash
