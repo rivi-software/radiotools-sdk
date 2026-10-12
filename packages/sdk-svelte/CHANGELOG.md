@@ -1,5 +1,12 @@
 # @rivi-software/radiotools-sdk-svelte
 
+## 0.3.0
+
+### Patch Changes
+
+- Updated dependencies [ea21861]
+  - @rivi-software/radiotools-sdk@0.3.0
+
 ## 0.2.2
 
 ### Patch Changes
