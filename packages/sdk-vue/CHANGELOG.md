@@ -1,5 +1,12 @@
 # @rivi-software/radiotools-sdk-vue
 
+## 0.4.0
+
+### Patch Changes
+
+- Updated dependencies [5247f4b]
+  - @rivi-software/radiotools-sdk@0.4.0
+
 ## 0.3.0
 
 ### Patch Changes
