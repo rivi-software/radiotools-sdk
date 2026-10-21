@@ -13,6 +13,7 @@ import {
   parseGraphqlRecord,
   parseGraphqlSchedule,
   parseGraphqlSchemas,
+  parseGraphqlShows,
   parseGraphqlStation,
   parseGraphqlTrackHistory,
   parseGraphqlTraffic,
@@ -20,11 +21,18 @@ import {
   programsQuery,
   scheduleQuery,
   schemasQuery,
+  showsQuery,
   stationQuery,
   trackHistoryQuery,
   trafficQuery,
   weatherQuery,
 } from "./graphql";
+import {
+  collectionParser,
+  recordParser,
+  type SdkPublishedCollectionOf,
+  type SdkPublishedRecordOf,
+} from "./content-types";
 import type { EtagCache, FetchLike, PublicJsonRequestOptions } from "./http";
 import { readPublicJson } from "./http";
 import { reportPlayback } from "./playback";
@@ -40,9 +48,9 @@ import type {
   SdkPublicPrograms,
   SdkPublicSchedule,
   SdkPublicSchemaList,
+  SdkPublicShows,
   SdkPublicStation,
   SdkPublicTrackHistory,
-  SdkPublishedCollection,
   SdkPublishedRecord,
   SdkRevisionPreview,
   SdkTrafficPublic,
@@ -86,8 +94,9 @@ export type ContentFilter =
   | { field: string; op?: "eq" | "contains"; value: string }
   | { field: string; op: "anyOf"; values: string[] };
 
-export type ContentListOptions = {
-  type: string;
+export type ContentListOptions<T extends string = string> = {
+  /** A content type key; `news`, `presenters`, `shows` and `pages` return typed records. */
+  type: T;
   cursor?: string;
   limit?: number;
   /** `publishedAt` (default): first publication; `updatedAt`: the live version's publication. */
@@ -143,17 +152,24 @@ export type ReportPlaybackTarget = {
 export type StationClient = {
   getStation: () => Promise<SdkPublicStation>;
   getSchemas: () => Promise<SdkPublicSchemaList>;
-  getContent: (options: ContentListOptions) => Promise<SdkPublishedCollection>;
+  /** One page of a type's published records; a default type's records come typed. */
+  getContent: <T extends string>(
+    options: ContentListOptions<T>,
+  ) => Promise<SdkPublishedCollectionOf<T>>;
+  /** One published record of any type; `asContentType` narrows it to a default type. */
   getContentRecord: (id: string) => Promise<SdkPublishedRecord>;
   /**
    * The published record a slug names. A slug the record used before also resolves, so compare
    * `record.values.slug` with the requested slug and redirect when they differ.
    */
-  getContentBySlug: (type: string, slug: string) => Promise<SdkPublishedRecord>;
-  iterateContent: (
-    options: Omit<ContentListOptions, "cursor">,
-  ) => AsyncGenerator<SdkPublishedRecord>;
+  getContentBySlug: <T extends string>(type: T, slug: string) => Promise<SdkPublishedRecordOf<T>>;
+  iterateContent: <T extends string>(
+    options: Omit<ContentListOptions<T>, "cursor">,
+  ) => AsyncGenerator<SdkPublishedRecordOf<T>>;
   getSchedule: (window: ScheduleWindow) => Promise<SdkPublicSchedule>;
+  /** The shows on air in the window, with their regular slots and presenters. */
+  getShows: (window: ScheduleWindow) => Promise<SdkPublicShows>;
+  /** @deprecated Use `getShows`, which returns the same shows; `programs` is removed in a later release. */
   getPrograms: (window: ScheduleWindow) => Promise<SdkPublicPrograms>;
   getCurrentBroadcast: () => Promise<SdkPublicCurrentBroadcast>;
   getNowPlaying: () => Promise<SdkPublicNowPlaying>;
@@ -305,7 +321,9 @@ export function createStationClient(options: CreateStationClientOptions): Statio
     });
   };
 
-  const getContent = async (list: ContentListOptions): Promise<SdkPublishedCollection> => {
+  const getContent = async <T extends string>(
+    list: ContentListOptions<T>,
+  ): Promise<SdkPublishedCollectionOf<T>> => {
     const { href } = await stationFor("content", "content");
     const limit = list.limit ?? 25;
     return preferGraphql(
@@ -325,7 +343,7 @@ export function createStationClient(options: CreateStationClientOptions): Statio
           },
           httpOptions,
         );
-        return parseGraphqlContent(list.type, data, limit);
+        return parseGraphqlContent(list.type, data, limit, collectionParser(list.type));
       },
       async () => {
         const params = new URLSearchParams({ type: list.type, limit: String(limit) });
@@ -335,7 +353,7 @@ export function createStationClient(options: CreateStationClientOptions): Statio
         for (const filter of list.filter ?? []) params.append("filter", contentFilterParam(filter));
         const { data } = await readPublicJson(
           absoluteUrl(options.baseUrl, `${href}?${params}`),
-          sdkSchemas.PublishedCollection,
+          collectionParser(list.type),
           httpOptions,
         );
         return data;
@@ -366,7 +384,10 @@ export function createStationClient(options: CreateStationClientOptions): Statio
     );
   };
 
-  const getContentBySlug = async (type: string, slug: string): Promise<SdkPublishedRecord> => {
+  const getContentBySlug = async <T extends string>(
+    type: T,
+    slug: string,
+  ): Promise<SdkPublishedRecordOf<T>> => {
     const { href } = await stationFor("content", "content");
     return preferGraphql(
       async () => {
@@ -376,13 +397,13 @@ export function createStationClient(options: CreateStationClientOptions): Statio
           { type, slug },
           httpOptions,
         );
-        return parseGraphqlRecord(data.contentBySlug);
+        return parseGraphqlRecord(data.contentBySlug, recordParser(type));
       },
       async () => {
         const path = `${href}/${encodeURIComponent(type)}/by-slug/${encodeURIComponent(slug)}`;
         const { data } = await readPublicJson(
           absoluteUrl(options.baseUrl, path),
-          sdkSchemas.PublishedRecord,
+          recordParser(type),
           httpOptions,
         );
         return data;
@@ -390,14 +411,14 @@ export function createStationClient(options: CreateStationClientOptions): Statio
     );
   };
 
-  async function* iterateContent(
-    list: Omit<ContentListOptions, "cursor">,
-  ): AsyncGenerator<SdkPublishedRecord> {
+  async function* iterateContent<T extends string>(
+    list: Omit<ContentListOptions<T>, "cursor">,
+  ): AsyncGenerator<SdkPublishedRecordOf<T>> {
     const seen = new Set<string>();
     let cursor: string | undefined;
     do {
       const page = await getContent({ ...list, cursor });
-      for (const record of page.records) yield record;
+      for (const record of page.records) yield record as SdkPublishedRecordOf<T>;
       if (!page.nextCursor || seen.has(page.nextCursor)) return;
       seen.add(page.nextCursor);
       cursor = page.nextCursor;
@@ -422,6 +443,31 @@ export function createStationClient(options: CreateStationClientOptions): Statio
         const { data } = await readPublicJson(
           absoluteUrl(options.baseUrl, `${href}?${params}`),
           sdkSchemas.PublicSchedule,
+          httpOptions,
+        );
+        return data;
+      },
+    );
+  };
+
+  const getShows = async (window: ScheduleWindow): Promise<SdkPublicShows> => {
+    assertScheduleWindow(window);
+    const { href } = await stationFor("shows", "shows");
+    return preferGraphql(
+      async () => {
+        const data = await graphqlRequest<{ shows: unknown }>(
+          graphqlEndpoint,
+          showsQuery,
+          window,
+          httpOptions,
+        );
+        return parseGraphqlShows(data);
+      },
+      async () => {
+        const params = new URLSearchParams(window);
+        const { data } = await readPublicJson(
+          absoluteUrl(options.baseUrl, `${href}?${params}`),
+          sdkSchemas.PublicShows,
           httpOptions,
         );
         return data;
@@ -600,6 +646,7 @@ export function createStationClient(options: CreateStationClientOptions): Statio
     getContentBySlug,
     iterateContent,
     getSchedule,
+    getShows,
     getPrograms,
     getCurrentBroadcast,
     getNowPlaying,

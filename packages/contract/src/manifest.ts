@@ -16,6 +16,8 @@ export type SdkClientMethod = {
   scope: AuthScope | "either";
   description: string;
   graphqlField?: string;
+  /** Still served, with a successor; removed in a later release. */
+  deprecated?: boolean;
   rest?: {
     method: "GET" | "POST";
     pathPattern: string;
@@ -103,14 +105,14 @@ export const listenerSdkManifest: SdkManifest = {
     {
       name: "getSchemas",
       scope: "listener:read",
-      description: "Content type schemas for published editorial.",
+      description: "Content type definitions: news, presenters, shows, pages and any type RIVI added.",
       graphqlField: "schemas",
       rest: { method: "GET", pathPattern: "{resources.schemas}", resourceKey: "schemas" },
     },
     {
       name: "getContent",
       scope: "listener:read",
-      description: "Paginated published content records, newest first; sort, direction and filters.",
+      description: "Paginated published records of one type, newest first; typed for news, presenters, shows and pages.",
       graphqlField: "content",
       rest: { method: "GET", pathPattern: "{resources.content}", resourceKey: "content" },
     },
@@ -140,9 +142,17 @@ export const listenerSdkManifest: SdkManifest = {
       rest: { method: "GET", pathPattern: "{resources.schedule}", resourceKey: "schedule" },
     },
     {
+      name: "getShows",
+      scope: "listener:read",
+      description: "Shows on air in a date window (1–31 inclusive days), with their regular slots.",
+      graphqlField: "shows",
+      rest: { method: "GET", pathPattern: "{resources.shows}", resourceKey: "shows" },
+    },
+    {
       name: "getPrograms",
       scope: "listener:read",
-      description: "Program summaries for a date window (1–31 inclusive days).",
+      description: "Deprecated: use getShows, which returns the same shows.",
+      deprecated: true,
       graphqlField: "programs",
       rest: { method: "GET", pathPattern: "{resources.programs}", resourceKey: "programs" },
     },

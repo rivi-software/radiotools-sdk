@@ -1,6 +1,6 @@
 import type { PublicJsonRequestOptions } from "./http";
 import { postJson, RadioToolsApiError } from "./http";
-import { sdkSchemas } from "./schemas";
+import { type SdkPublishedCollection, type SdkPublishedRecord, sdkSchemas } from "./schemas";
 
 export type GraphqlRequestOptions = PublicJsonRequestOptions & {
   previewGrant?: string;
@@ -118,6 +118,7 @@ export const stationQuery = /* GraphQL */ `
         schemas
         content
         schedule
+        shows
         programs
         broadcast
         nowPlaying
@@ -228,6 +229,37 @@ export const scheduleQuery = /* GraphQL */ `
   }
 `;
 
+const showFields = /* GraphQL */ `
+  id
+  title
+  profileId
+  presenters { id title }
+  slots {
+    weekday
+    startTime
+    durationMinutes
+    timezone
+    intervalWeeks
+    fromDate
+    throughDate
+    presenters { id title }
+  }
+`;
+
+export const showsQuery = /* GraphQL */ `
+  query SdkShows($fromDate: String!, $throughDate: String!) {
+    shows(fromDate: $fromDate, throughDate: $throughDate) {
+      contractVersion
+      timezone
+      fromDate
+      throughDate
+      truncated
+      shows { ${showFields} }
+    }
+  }
+`;
+
+/** @deprecated `programs` is the deprecated alias of `shows`; use `showsQuery`. */
 export const programsQuery = /* GraphQL */ `
   query SdkPrograms($fromDate: String!, $throughDate: String!) {
     programs(fromDate: $fromDate, throughDate: $throughDate) {
@@ -303,24 +335,28 @@ export function parseGraphqlStation(data: { station: unknown }) {
   return sdkSchemas.PublicStation.parse(omitNull(data.station, "profile"));
 }
 
-export function parseGraphqlRecord(record: unknown) {
-  return sdkSchemas.PublishedRecord.parse(omitNull(record, "related"));
+export function parseGraphqlRecord<T = SdkPublishedRecord>(
+  record: unknown,
+  schema: { parse: (data: unknown) => T } = sdkSchemas.PublishedRecord as never,
+): T {
+  return schema.parse(omitNull(record, "related"));
 }
 
 export function parseGraphqlSchemas(data: { schemas: unknown[] }) {
   return sdkSchemas.PublicSchemaList.parse({ contractVersion: 1, types: data.schemas });
 }
 
-export function parseGraphqlContent(
+export function parseGraphqlContent<T = SdkPublishedCollection>(
   type: string,
   data: { content: { records: unknown[]; nextCursor: string | null } },
   limit: number,
-) {
+  schema: { parse: (data: unknown) => T } = sdkSchemas.PublishedCollection as never,
+): T {
   const nextCursor = data.content.nextCursor;
-  return sdkSchemas.PublishedCollection.parse({
+  return schema.parse({
     contractVersion: 1,
     type,
-    records: data.content.records.map(parseGraphqlRecord),
+    records: data.content.records.map((record) => omitNull(record, "related")),
     nextCursor,
     page: { limit, nextCursor },
   });
@@ -328,6 +364,10 @@ export function parseGraphqlContent(
 
 export function parseGraphqlSchedule(data: { schedule: unknown }) {
   return sdkSchemas.PublicSchedule.parse(data.schedule);
+}
+
+export function parseGraphqlShows(data: { shows: unknown }) {
+  return sdkSchemas.PublicShows.parse(data.shows);
 }
 
 export function parseGraphqlPrograms(data: { programs: unknown }) {

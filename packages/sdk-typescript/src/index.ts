@@ -9,6 +9,14 @@ export {
   type StationClientTransport,
   type TrackHistoryOptions,
 } from "./client";
+export {
+  asContentType,
+  DEFAULT_CONTENT_TYPES,
+  type DefaultContentTypeKey,
+  isDefaultContentType,
+  type SdkPublishedCollectionOf,
+  type SdkPublishedRecordOf,
+} from "./content-types";
 export { createStationClientFromEnv, type RadioToolsEnv, stationClientOptionsFromEnv } from "./env";
 export { type EtagCache, type FetchLike, RadioToolsApiError, createEtagCache } from "./http";
 export { type PublicMediaVariant, publicMediaUrl } from "./media";
@@ -46,13 +54,23 @@ export {
   type SdkPublicRealtimeDescriptor,
   type SdkPublicSchedule,
   type SdkPublicSchemaList,
+  type SdkPublicShows,
   type SdkPublicSocketEvent,
   type SdkPublicStation,
   type SdkPublicStationProfile,
   type SdkPublicTrackHistory,
   type SdkPublishedCollection,
+  type SdkPublishedNews,
+  type SdkPublishedNewsCollection,
+  type SdkPublishedPage,
+  type SdkPublishedPageCollection,
+  type SdkPublishedPresenter,
+  type SdkPublishedPresenterCollection,
   type SdkPublishedRecord,
+  type SdkPublishedShow,
+  type SdkPublishedShowCollection,
   type SdkRevisionPreview,
+  type SdkRichText,
   type SdkTrafficPublic,
   type SdkWeatherPublic,
   sdkSchemas,

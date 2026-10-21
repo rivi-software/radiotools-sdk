@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { createStationClient } from "../src/client";
+import { asContentType } from "../src/content-types";
 import { createEtagCache } from "../src/http";
 import { stationClientOptionsFromEnv } from "../src/env";
 import { readPreviewHandoff } from "../src/preview";
@@ -17,6 +18,7 @@ const stationBody = {
     schemas: "/api/v1/stations/station-a/schemas",
     content: "/api/v1/stations/station-a/content",
     schedule: "/api/v1/stations/station-a/schedule",
+    shows: "/api/v1/stations/station-a/shows",
     programs: "/api/v1/stations/station-a/programs",
     broadcast: "/api/v1/stations/station-a/broadcast/current",
     nowPlaying: "/api/v1/stations/station-a/now-playing",
@@ -362,7 +364,7 @@ const recordBody = {
   schemaVersion: 1,
   publishedAt: "2026-10-10T10:00:00.000Z",
   firstPublishedAt: "2026-10-09T10:00:00.000Z",
-  values: { slug: "storm-eunice" },
+  values: { title: "Storm Eunice", slug: "storm-eunice" },
   document: { version: 1, mode: "document", blocks: [] },
   media: [
     {
@@ -460,12 +462,142 @@ test("getContentBySlug reads the by-slug resource", async () => {
       const url = new URL(String(input));
       paths.push(url.pathname);
       if (url.pathname.endsWith("/stations/station-a")) return Response.json(stationBody);
-      return Response.json({ ...recordBody, values: { slug: "storm-eunice-update" } });
+      return Response.json({
+        ...recordBody,
+        values: { title: "Storm Eunice", slug: "storm-eunice-update" },
+      });
     },
   });
   const record = await client.getContentBySlug("news", "storm eunice");
   expect(record.values.slug).toBe("storm-eunice-update");
   expect(paths[1]).toBe("/api/v1/stations/station-a/content/news/by-slug/storm%20eunice");
+});
+
+test("default content types come typed; other types keep the generic record", async () => {
+  const anna = {
+    ...recordBody,
+    id: "00000000-0000-4000-8000-000000000020",
+    type: "presenters",
+    values: { title: "Anna", slug: "anna", role: "Morning host" },
+  };
+  const show = {
+    ...recordBody,
+    id: "00000000-0000-4000-8000-000000000021",
+    type: "shows",
+    values: { title: "Weekend Ochtend", slug: "weekend-ochtend", presenters: [{ presenter: anna.id }] },
+    related: { programIds: ["00000000-0000-4000-8000-000000000022"] },
+  };
+  const event = { ...recordBody, type: "events", values: { slug: "open-day", venue: "Studio 1" } };
+  const page = (type: string, records: unknown[]) => ({
+    contractVersion: 1,
+    type,
+    records,
+    nextCursor: null,
+    page: { limit: 25, nextCursor: null },
+  });
+  const client = createStationClient({
+    baseUrl: "https://radio.example",
+    stationSlug: "station-a",
+    apiToken: "fixture-api-token",
+    fetch: async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/stations/station-a")) return Response.json(stationBody);
+      if (url.pathname.endsWith(`/content/${anna.id}`)) return Response.json(anna);
+      const type = url.searchParams.get("type") ?? "";
+      if (type === "shows") return Response.json(page("shows", [show]));
+      if (type === "events") return Response.json(page("events", [event]));
+      // A news record without its required title does not fit the typed record.
+      return Response.json(page("news", [{ ...recordBody, values: { slug: "storm-eunice" } }]));
+    },
+  });
+  const shows = await client.getContent({ type: "shows" });
+  const presenterId = shows.records[0]?.values.presenters?.[0]?.presenter;
+  expect(presenterId).toBe(anna.id);
+  const presenter = asContentType(await client.getContentRecord(anna.id), "presenters");
+  expect(presenter?.values.role).toBe("Morning host");
+  expect(asContentType(await client.getContentRecord(anna.id), "shows")).toBeNull();
+  const events = await client.getContent({ type: "events" });
+  expect(events.records[0]?.values.venue).toBe("Studio 1");
+  await expect(client.getContent({ type: "news" })).rejects.toThrow();
+  for await (const record of client.iterateContent({ type: "shows" }))
+    expect(record.values.website).toBeUndefined();
+});
+
+test("getShows reads the shows resource; getPrograms still reads its alias", async () => {
+  const paths: string[] = [];
+  const shows = {
+    contractVersion: 1,
+    timezone: "Europe/Amsterdam",
+    fromDate: "2026-10-21",
+    throughDate: "2026-10-27",
+    truncated: false,
+  };
+  const client = createStationClient({
+    baseUrl: "https://radio.example",
+    stationSlug: "station-a",
+    apiToken: "fixture-api-token",
+    fetch: async (input) => {
+      const url = new URL(String(input));
+      paths.push(`${url.pathname}${url.search}`);
+      if (url.pathname.endsWith("/stations/station-a")) return Response.json(stationBody);
+      if (url.pathname.endsWith("/shows")) return Response.json({ ...shows, shows: [] });
+      return Response.json({ ...shows, programs: [] });
+    },
+  });
+  const window = { fromDate: "2026-10-21", throughDate: "2026-10-27" };
+  expect((await client.getShows(window)).shows).toEqual([]);
+  expect((await client.getPrograms(window)).programs).toEqual([]);
+  expect(paths.slice(1)).toEqual([
+    "/api/v1/stations/station-a/shows?fromDate=2026-10-21&throughDate=2026-10-27",
+    "/api/v1/stations/station-a/programs?fromDate=2026-10-21&throughDate=2026-10-27",
+  ]);
+});
+
+test("GraphQL reads shows and the station's shows link", async () => {
+  const queries: string[] = [];
+  const client = createStationClient({
+    baseUrl: "https://radio.example",
+    stationSlug: "station-a",
+    apiToken: "fixture-api-token",
+    transport: "graphql",
+    fetch: async (_url, init) => {
+      const body = JSON.parse(String(init?.body)) as { query: string };
+      queries.push(body.query);
+      if (queries.length === 1)
+        return Response.json({ data: { station: { ...stationBody, profile: null } } });
+      return Response.json({
+        data: {
+          shows: {
+            contractVersion: 1,
+            timezone: "Europe/Amsterdam",
+            fromDate: "2026-10-21",
+            throughDate: "2026-10-27",
+            shows: [],
+            truncated: false,
+          },
+        },
+      });
+    },
+  });
+  await client.getShows({ fromDate: "2026-10-21", throughDate: "2026-10-27" });
+  expect(queries[0]).toMatch(/\bshows\b/);
+  expect(queries[1]).toMatch(/shows\(fromDate/);
+});
+
+test("the Python types name the same fields as the typed records", async () => {
+  const types = new URL("../../sdk-python/src/radiotools_sdk/types.py", import.meta.url);
+  const source = await Bun.file(types).text();
+  const fields = (name: string) => {
+    const body = source.split(`class ${name}(TypedDict):`)[1]?.split("\n\n\n")[0] ?? "";
+    return [...body.matchAll(/^ {4}(\w+):/gm)].map((match) => match[1]).sort();
+  };
+  for (const [name, schema] of [
+    ["NewsValues", sdkSchemas.PublishedNews],
+    ["PresenterValues", sdkSchemas.PublishedPresenter],
+    ["ShowValues", sdkSchemas.PublishedShow],
+    ["PageValues", sdkSchemas.PublishedPage],
+  ] as const)
+    expect(fields(name)).toEqual(Object.keys(schema.shape.values.shape).sort());
 });
 
 test("station profile, programme slots and traffic causes parse", () => {
