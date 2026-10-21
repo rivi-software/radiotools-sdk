@@ -6,6 +6,7 @@ scalar JSON
     """
     Published records of one type, newest first by default. publishedAt orders by first
     publication, updatedAt by the live version's publication; pass nextCursor to continue.
+    The type key "programs" is a deprecated alias of "shows".
     """
     content(
       type: String!
@@ -21,7 +22,12 @@ scalar JSON
     """
     contentBySlug(type: String!, slug: String!): PublishedRecord!
     schedule(fromDate: String!, throughDate: String!): Schedule!
+    """
+    The shows on air in the window, with their regular slots.
+    """
+    shows(fromDate: String!, throughDate: String!): Shows!
     programs(fromDate: String!, throughDate: String!): Programs!
+      @deprecated(reason: "Use shows, which returns the same shows.")
     currentBroadcast: CurrentBroadcast!
     nowPlaying: NowPlaying!
     trackHistory(cursor: String, limit: Int = 25): TrackHistory!
@@ -79,7 +85,8 @@ scalar JSON
     schemas: String!
     content: String
     schedule: String
-    programs: String
+    shows: String
+    programs: String @deprecated(reason: "Use shows.")
     broadcast: String
     nowPlaying: String
     trackHistory: String
@@ -152,12 +159,67 @@ scalar JSON
     publishedAt: String!
     firstPublishedAt: String!
     values: JSON!
+    """
+    The values of a news, presenters, shows or pages record, typed; null for a catalog or
+    custom type, whose values are only in values.
+    """
+    typedValues: DefaultTypeValues
     document: JSON!
     media: [PublicMedia!]!
     """
-    Planning programmes a published programs/presenters profile belongs to; null for other types.
+    Planning shows a published shows/presenters profile belongs to; null for other types.
     """
     related: PublishedRelated
+  }
+
+  """
+  The fields every station's news, presenters, shows and pages share. title and slug are always
+  set; any other field is null until the record sets it.
+  """
+  union DefaultTypeValues = NewsValues | PresenterValues | ShowValues | PageValues
+
+  type NewsValues {
+    title: String!
+    slug: String!
+    "A media asset id: the media entry with this assetId."
+    featured_image: ID
+    summary: String
+    "A choice key; the station manages the options and their labels (schemas)."
+    category: String
+    source: String
+  }
+
+  type PresenterValues {
+    "The presenter's name."
+    title: String!
+    slug: String!
+    featured_image: ID
+    "Rich text."
+    bio: JSON
+    role: String
+  }
+
+  type ShowValues {
+    title: String!
+    slug: String!
+    featured_image: ID
+    "Rich text."
+    description: JSON
+    presenters: [ShowPresenter!]
+    website: String
+  }
+
+  type ShowPresenter {
+    "The id of a published presenters record."
+    presenter: ID
+  }
+
+  type PageValues {
+    title: String!
+    slug: String!
+    featured_image: ID
+    "Also the page's meta description."
+    summary: String
   }
 
   type PublishedRelated {
@@ -192,6 +254,40 @@ scalar JSON
     truncated: Boolean!
   }
 
+  type Shows {
+    contractVersion: Int!
+    timezone: String!
+    fromDate: String!
+    throughDate: String!
+    shows: [ShowSummary!]!
+    truncated: Boolean!
+  }
+
+  type ShowSummary {
+    id: ID!
+    title: String!
+    profileId: ID
+    presenters: [BroadcastPresenter!]!
+    slots: [ShowSlot!]!
+  }
+
+  """
+  A regular slot: weekday 0 = Sunday … 6 = Saturday, startTime is wall time in timezone.
+  """
+  type ShowSlot {
+    weekday: Int!
+    startTime: String!
+    durationMinutes: Int!
+    timezone: String!
+    intervalWeeks: Int!
+    fromDate: String!
+    throughDate: String!
+    presenters: [BroadcastPresenter!]!
+  }
+
+  """
+  Deprecated: the result of the deprecated programs query. Use shows.
+  """
   type Programs {
     contractVersion: Int!
     timezone: String!

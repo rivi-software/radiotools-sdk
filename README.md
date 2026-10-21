@@ -33,7 +33,7 @@ contract (manifest + GraphQL schema)
                  └─ openapi.json                       (from Zod schemas)
 ```
 
-Only the TypeScript package has GraphQL, WebSocket, ETag and retry support; the other language SDKs are minimal REST stubs.
+Only the TypeScript package has GraphQL, WebSocket, ETag and retry support. The Python client implements the REST listener reads with typed records for the four default content types; the other language SDKs are minimal REST stubs.
 
 ## Packages
 
@@ -46,7 +46,7 @@ Only the TypeScript package has GraphQL, WebSocket, ETag and retry support; the 
 | [`@rivi-software/radiotools-sdk-vue`](packages/sdk-vue) | Vue composables (generated) |
 | [`@rivi-software/radiotools-sdk-svelte`](packages/sdk-svelte) | Svelte stores (generated) |
 | [`@rivi-software/radiotools-sdk-next`](packages/sdk-next) | Next.js App Router server helpers (generated) |
-| [`radiotools-sdk`](packages/sdk-python) | Python `httpx` stubs (generated) |
+| [`radiotools-sdk`](packages/sdk-python) | Python `httpx` client (generated) |
 | [`radiotools-sdk-go`](packages/sdk-go) | Go `net/http` stubs (generated) |
 | [`RadioTools.Sdk`](packages/sdk-dotnet) | .NET `HttpClient` stubs (generated) |
 | [`radiotools_sdk`](packages/sdk-ruby) | Ruby `Net::HTTP` stubs (generated) |

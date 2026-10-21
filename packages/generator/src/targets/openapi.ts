@@ -119,6 +119,10 @@ function renderOpenApi(): string {
         { name: "fromDate", required: true, schema: { type: "string", format: "date" } },
         { name: "throughDate", required: true, schema: { type: "string", format: "date" } },
       ],
+      getShows: [
+        { name: "fromDate", required: true, schema: { type: "string", format: "date" } },
+        { name: "throughDate", required: true, schema: { type: "string", format: "date" } },
+      ],
       getPrograms: [
         { name: "fromDate", required: true, schema: { type: "string", format: "date" } },
         { name: "throughDate", required: true, schema: { type: "string", format: "date" } },
@@ -150,6 +154,7 @@ function renderOpenApi(): string {
       get: {
         operationId: method.name,
         summary: method.description,
+        ...(method.deprecated ? { deprecated: true } : {}),
         tags: ["listener"],
         security: [{ bearerListener: [] }],
         parameters: [

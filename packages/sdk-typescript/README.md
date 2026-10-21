@@ -41,7 +41,7 @@ const schedule = await client.getSchedule({ fromDate: "2026-10-06", throughDate:
 
 ### Client methods
 
-`getStation`, `getSchemas`, `getContent`, `getContentRecord`, `getContentBySlug`, `iterateContent`, `getSchedule`, `getPrograms`, `getCurrentBroadcast`, `getNowPlaying`, `getTrackHistory`, `iterateTrackHistory`, `getWeather`, `getTraffic`, `recommendedPollIntervalMs`, `previewEditorial`, `reportPlayback`, `subscribe`.
+`getStation`, `getSchemas`, `getContent`, `getContentRecord`, `getContentBySlug`, `iterateContent`, `getSchedule`, `getShows`, `getPrograms` (deprecated alias of `getShows`), `getCurrentBroadcast`, `getNowPlaying`, `getTrackHistory`, `iterateTrackHistory`, `getWeather`, `getTraffic`, `recommendedPollIntervalMs`, `previewEditorial`, `reportPlayback`, `subscribe`.
 
 Schedule windows are `YYYY-MM-DD` dates covering 1 to 31 inclusive days. Programmes include their presenters and regular `slots` (weekday, start time, duration); broadcasts carry a `nature` of `live`, `prerecorded` or `repeat`. `station.profile` holds the tagline, frequency label, links and contact details once the station has saved them.
 
@@ -69,7 +69,7 @@ if (article.values.slug !== "storm-eunice") {
 }
 ```
 
-Cursors are opaque strings. Records carry `firstPublishedAt` (corrections do not move it) next to `publishedAt`, and `programs`/`presenters` records link to planning through `related.programIds`. Each media entry has `alt`, `width`, `height`, `duration` and `variants` (`thumb`, `display`, and the focal crops `card` (16:9) and `square`), each `null` when absent, so sites can build `srcset` and reserve the aspect ratio. `publicMediaUrl(baseUrl, station.resources.media, versionId, "card")` builds the same URLs.
+Cursors are opaque strings. Records carry `firstPublishedAt` (corrections do not move it) next to `publishedAt`, and `shows`/`presenters` records link to planning through `related.programIds`. `news`, `presenters`, `shows` and `pages` records come typed (`SdkPublishedNews` and the others): every station has these four types with the same fields. Any other type returns `SdkPublishedRecord`; `asContentType(record, "shows")` narrows a record whose type is only known at runtime. Each media entry has `alt`, `width`, `height`, `duration` and `variants` (`thumb`, `display`, and the focal crops `card` (16:9) and `square`), each `null` when absent, so sites can build `srcset` and reserve the aspect ratio. `publicMediaUrl(baseUrl, station.resources.media, versionId, "card")` builds the same URLs.
 
 ### Realtime
 

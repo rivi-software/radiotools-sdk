@@ -124,6 +124,9 @@ export const PublicStation = z.object({
     schemas: href,
     content: href.nullable(),
     schedule: href.nullable(),
+    /** The shows with their regular slots. */
+    shows: href.nullable(),
+    /** @deprecated Use `shows`, which serves the same shows; `programs` is removed in a later release. */
     programs: href.nullable(),
     broadcast: href.nullable(),
     nowPlaying: href.nullable(),
@@ -408,8 +411,8 @@ export const PublishedRecord = z.object({
   document: EditorialDocument,
   media: z.array(PublicMedia).max(100),
   /**
-   * Planning links of a published `programs` or `presenters` record: the programmes it is the
-   * profile of, or presents. Matches `program.id` in the public schedule and programmes.
+   * Planning links of a published `shows` or `presenters` record: the shows it is the profile of,
+   * or presents. Matches `program.id` in the public schedule and `id` in the shows.
    */
   related: z.object({ programIds: z.array(z.uuid()).max(50) }).optional(),
 });
@@ -424,6 +427,118 @@ export const PublishedCollection = z.object({
     nextCursor: z.string().max(400).nullable(),
   }),
 });
+/** Rich text in a field such as a presenter's bio: paragraphs and headings, or text blocks. */
+export const RichText = z.union([
+  z
+    .object({
+      version: z.literal(1),
+      blocks: z
+        .array(
+          z.discriminatedUnion("type", [
+            z.object({ type: z.literal("paragraph"), text: z.string().max(20000) }).strict(),
+            z
+              .object({
+                type: z.literal("heading"),
+                level: z.number().int().min(1).max(3),
+                text: z.string().max(20000),
+              })
+              .strict(),
+          ]),
+        )
+        .max(100),
+    })
+    .strict(),
+  z
+    .object({
+      version: z.literal(2),
+      blocks: z
+        .array(z.union([EditorialBlock.options[0], EditorialBlock.options[1], EditorialBlock.options[2]]))
+        .max(100),
+    })
+    .strict(),
+]);
+
+/*
+ * The four content types every station has, with fields fixed in RadioTools: their records have
+ * typed `values`. `title` and `slug` are always set; any other field is absent until the record
+ * sets it. A record published before its station moved onto the fixed schema may carry other keys
+ * until it is republished, so the values objects accept extra JSON keys. A catalog type (`events`,
+ * `notices`) or a custom type keeps the generic `PublishedRecord`.
+ */
+const operationalValues = {
+  title: z.string(),
+  slug: z.string(),
+  /** A media asset id: the record's `media` entry with this `assetId`. */
+  featured_image: z.uuid().optional(),
+};
+export const PublishedNewsValues = z
+  .object({
+    ...operationalValues,
+    /** At most 300 characters. */
+    summary: z.string().optional(),
+    /** A choice key; the station manages the options, so read the labels from the schemas. */
+    category: z.string().optional(),
+    source: z.string().optional(),
+  })
+  .catchall(JsonValue);
+export const PublishedPresenterValues = z
+  .object({
+    ...operationalValues,
+    /** The presenter's name. */
+    title: z.string(),
+    bio: RichText.optional(),
+    role: z.string().optional(),
+  })
+  .catchall(JsonValue);
+export const PublishedShowValues = z
+  .object({
+    ...operationalValues,
+    description: RichText.optional(),
+    /** Up to 10 rows, each naming a published `presenters` record by id. */
+    presenters: z.array(z.object({ presenter: z.uuid().optional() }).catchall(JsonValue)).optional(),
+    website: z.string().optional(),
+  })
+  .catchall(JsonValue);
+export const PublishedPageValues = z
+  .object({
+    ...operationalValues,
+    /** At most 300 characters; also the page's meta description. */
+    summary: z.string().optional(),
+  })
+  .catchall(JsonValue);
+export const PublishedNews = PublishedRecord.extend({
+  type: z.literal("news"),
+  values: PublishedNewsValues,
+});
+export const PublishedPresenter = PublishedRecord.extend({
+  type: z.literal("presenters"),
+  values: PublishedPresenterValues,
+});
+export const PublishedShow = PublishedRecord.extend({
+  type: z.literal("shows"),
+  values: PublishedShowValues,
+});
+export const PublishedPage = PublishedRecord.extend({
+  type: z.literal("pages"),
+  values: PublishedPageValues,
+});
+export const PublishedNewsCollection = PublishedCollection.extend({
+  type: z.literal("news"),
+  records: z.array(PublishedNews).max(50),
+});
+export const PublishedPresenterCollection = PublishedCollection.extend({
+  type: z.literal("presenters"),
+  records: z.array(PublishedPresenter).max(50),
+});
+export const PublishedShowCollection = PublishedCollection.extend({
+  type: z.literal("shows"),
+  records: z.array(PublishedShow).max(50),
+});
+export const PublishedPageCollection = PublishedCollection.extend({
+  type: z.literal("pages"),
+  records: z.array(PublishedPage).max(50),
+});
+
 export const PreviewInput = z
   .object({
     stationId: z.string().min(1).max(80),
@@ -490,6 +605,16 @@ export const PublicProgram = z.object({
   /** Regular slots whose rule overlaps the requested window, Monday first. */
   slots: z.array(PublicProgramSlot).max(100),
 });
+/** The shows on air in a window, with their regular slots and presenters. */
+export const PublicShows = z.object({
+  contractVersion: ListenerContractVersion,
+  timezone: Timezone,
+  fromDate: LocalDate,
+  throughDate: LocalDate,
+  shows: z.array(PublicProgram).max(500),
+  truncated: z.boolean(),
+});
+/** @deprecated The `programs` response, the same shows under `programs`. Use `PublicShows`. */
 export const PublicPrograms = z.object({
   contractVersion: ListenerContractVersion,
   timezone: Timezone,
@@ -859,7 +984,16 @@ export const sdkSchemas = {
   PublicSchemaList,
   PublishedRecord,
   PublishedCollection,
+  PublishedNews,
+  PublishedPresenter,
+  PublishedShow,
+  PublishedPage,
+  PublishedNewsCollection,
+  PublishedPresenterCollection,
+  PublishedShowCollection,
+  PublishedPageCollection,
   PublicSchedule,
+  PublicShows,
   PublicPrograms,
   PublicCurrentBroadcast,
   WeatherPublic,
@@ -883,8 +1017,19 @@ export type SdkPublicSchema = z.infer<typeof PublicSchema>;
 export type SdkPublicSchemaList = z.infer<typeof PublicSchemaList>;
 export type SdkPublishedRecord = z.infer<typeof PublishedRecord>;
 export type SdkPublishedCollection = z.infer<typeof PublishedCollection>;
+export type SdkRichText = z.infer<typeof RichText>;
+export type SdkPublishedNews = z.infer<typeof PublishedNews>;
+export type SdkPublishedPresenter = z.infer<typeof PublishedPresenter>;
+export type SdkPublishedShow = z.infer<typeof PublishedShow>;
+export type SdkPublishedPage = z.infer<typeof PublishedPage>;
+export type SdkPublishedNewsCollection = z.infer<typeof PublishedNewsCollection>;
+export type SdkPublishedPresenterCollection = z.infer<typeof PublishedPresenterCollection>;
+export type SdkPublishedShowCollection = z.infer<typeof PublishedShowCollection>;
+export type SdkPublishedPageCollection = z.infer<typeof PublishedPageCollection>;
 export type SdkPublicMedia = z.infer<typeof PublicMedia>;
 export type SdkPublicSchedule = z.infer<typeof PublicSchedule>;
+export type SdkPublicShows = z.infer<typeof PublicShows>;
+/** @deprecated Use `SdkPublicShows`. */
 export type SdkPublicPrograms = z.infer<typeof PublicPrograms>;
 export type SdkPublicProgramSlot = z.infer<typeof PublicProgramSlot>;
 export type SdkPublicCurrentBroadcast = z.infer<typeof PublicCurrentBroadcast>;

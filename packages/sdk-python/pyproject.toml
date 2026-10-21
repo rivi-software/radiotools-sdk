@@ -1,7 +1,7 @@
 [project]
 name = "radiotools-sdk"
-version = "0.2.0"
-description = "RadioTools listener SDK for Python (generated REST stubs)"
+version = "0.3.0"
+description = "RadioTools listener SDK for Python (generated REST client)"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
