@@ -3,7 +3,9 @@ package com.radiotools.sdk
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
@@ -54,26 +56,19 @@ class StationClient private constructor(
 
     @Throws(IOException::class)
     fun getNowPlaying(): JsonObject {
-        val station = getStation()
-        val href =
-            station["resources"]?.let { it as? JsonObject }?.get("nowPlaying")?.toString()?.trim('"')
-                ?: error("nowPlaying resource unavailable")
+        val href = resourceHref(getStation(), "nowPlaying") ?: error("nowPlaying resource unavailable")
         return getJson(href, ingest = false)
     }
 
     @Throws(IOException::class)
     fun getWeather(): JsonObject? {
-        val href =
-            getStation()["resources"]?.let { it as? JsonObject }?.get("weather")?.toString()?.trim('"')
-        if (href.isNullOrEmpty()) return null
+        val href = resourceHref(getStation(), "weather") ?: return null
         return getJson(href, ingest = false)
     }
 
     @Throws(IOException::class)
     fun getTraffic(): JsonObject? {
-        val href =
-            getStation()["resources"]?.let { it as? JsonObject }?.get("traffic")?.toString()?.trim('"')
-        if (href.isNullOrEmpty()) return null
+        val href = resourceHref(getStation(), "traffic") ?: return null
         return getJson(href, ingest = false)
     }
 
@@ -89,6 +84,13 @@ class StationClient private constructor(
         return postJson(path, observation, ingest = true)
     }
 
+    /** The station's link for [key], or null when the station does not publish it (JSON null). */
+    private fun resourceHref(station: JsonObject, key: String): String? =
+        (station["resources"] as? JsonObject)
+            ?.get(key)
+            ?.let { (it as? JsonPrimitive)?.contentOrNull }
+            ?.takeIf { it.isNotEmpty() }
+
     private fun getJson(path: String, ingest: Boolean): JsonObject {
         val url = if (path.startsWith("http")) path else "$baseUrl$path"
         val request =
@@ -99,7 +101,7 @@ class StationClient private constructor(
                 .build()
         http.newCall(request).execute().use { response ->
             val body = response.body?.string() ?: "{}"
-            if (!response.isSuccessful) error("GET ${'$'}url failed: ${response.code} ${'$'}body")
+            if (!response.isSuccessful) error("GET $url failed: ${response.code} $body")
             return json.decodeFromString(JsonObject.serializer(), body)
         }
     }
@@ -116,7 +118,7 @@ class StationClient private constructor(
                 .build()
         http.newCall(request).execute().use { response ->
             val text = response.body?.string() ?: "{}"
-            if (!response.isSuccessful) error("POST ${'$'}url failed: ${response.code} ${'$'}text")
+            if (!response.isSuccessful) error("POST $url failed: ${response.code} $text")
             return json.decodeFromString(JsonObject.serializer(), text)
         }
     }

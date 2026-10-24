@@ -140,11 +140,11 @@ class RadioToolsStationClient:
         return self._get_json(f"{self._resource('content')}/{quote(content_type, safe='')}/by-slug/{quote(slug, safe='')}")
 
     def get_schedule(self, from_date: str, through_date: str) -> dict[str, Any]:
-        """Broadcast schedule for a date window (1–31 inclusive days)."""
+        """Broadcast schedule for a date window (1–42 inclusive days)."""
         return self._get_json(self._resource("schedule"), params={"fromDate": from_date, "throughDate": through_date})
 
     def get_shows(self, from_date: str, through_date: str) -> dict[str, Any]:
-        """Shows on air in a date window (1–31 inclusive days), with their regular slots."""
+        """Shows on air in a date window (1–42 inclusive days), with their regular slots."""
         return self._get_json(self._resource("shows"), params={"fromDate": from_date, "throughDate": through_date})
 
     def get_programs(self, from_date: str, through_date: str) -> dict[str, Any]:

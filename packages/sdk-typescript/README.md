@@ -43,7 +43,7 @@ const schedule = await client.getSchedule({ fromDate: "2026-10-06", throughDate:
 
 `getStation`, `getSchemas`, `getContent`, `getContentRecord`, `getContentBySlug`, `iterateContent`, `getSchedule`, `getShows`, `getPrograms` (deprecated alias of `getShows`), `getCurrentBroadcast`, `getNowPlaying`, `getTrackHistory`, `iterateTrackHistory`, `getWeather`, `getTraffic`, `recommendedPollIntervalMs`, `previewEditorial`, `reportPlayback`, `subscribe`.
 
-Schedule windows are `YYYY-MM-DD` dates covering 1 to 31 inclusive days. Programmes include their presenters and regular `slots` (weekday, start time, duration); broadcasts carry a `nature` of `live`, `prerecorded` or `repeat`. `station.profile` holds the tagline, frequency label, links and contact details once the station has saved them.
+Schedule windows are `YYYY-MM-DD` dates covering 1 to 42 inclusive days. Programmes include their presenters and regular `slots` (weekday, start time, duration); broadcasts carry a `nature` of `live`, `prerecorded` or `repeat`. `station.profile` holds the tagline, frequency label, links and contact details once the station has saved them.
 
 ### Content
 

@@ -47,7 +47,7 @@ Only the TypeScript package has GraphQL, WebSocket, ETag and retry support. The 
 | [`@rivi-software/radiotools-sdk-svelte`](packages/sdk-svelte) | Svelte stores (generated) |
 | [`@rivi-software/radiotools-sdk-next`](packages/sdk-next) | Next.js App Router server helpers (generated) |
 | [`radiotools-sdk`](packages/sdk-python) | Python `httpx` client (generated) |
-| [`radiotools-sdk-go`](packages/sdk-go) | Go `net/http` stubs (generated) |
+| [`github.com/rivi-software/radiotools-sdk/packages/sdk-go`](packages/sdk-go) | Go `net/http` stubs (generated) |
 | [`RadioTools.Sdk`](packages/sdk-dotnet) | .NET `HttpClient` stubs (generated) |
 | [`radiotools_sdk`](packages/sdk-ruby) | Ruby `Net::HTTP` stubs (generated) |
 | [`radiotools/sdk`](packages/sdk-php) | PHP curl stubs (generated) |

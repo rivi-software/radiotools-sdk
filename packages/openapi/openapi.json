@@ -522,11 +522,11 @@
             "properties": {
               "cache": {
                 "type": "string",
-                "const": "no-store"
+                "minLength": 1
               },
               "conditional": {
                 "type": "string",
-                "const": "etag"
+                "minLength": 1
               },
               "pollIntervalSeconds": {
                 "type": "integer",
@@ -15510,7 +15510,7 @@
     "/api/v1/stations/{stationSlug}/schedule": {
       "get": {
         "operationId": "getSchedule",
-        "summary": "Broadcast schedule for a date window (1–31 inclusive days).",
+        "summary": "Broadcast schedule for a date window (1–42 inclusive days).",
         "tags": [
           "listener"
         ],
@@ -15584,7 +15584,7 @@
     "/api/v1/stations/{stationSlug}/shows": {
       "get": {
         "operationId": "getShows",
-        "summary": "Shows on air in a date window (1–31 inclusive days), with their regular slots.",
+        "summary": "Shows on air in a date window (1–42 inclusive days), with their regular slots.",
         "tags": [
           "listener"
         ],

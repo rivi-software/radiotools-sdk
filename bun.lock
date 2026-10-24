@@ -21,8 +21,8 @@
         "radiotools-sdk-generate": "./dist/cli.js",
       },
       "dependencies": {
-        "@rivi-software/radiotools-contract": "workspace:*",
-        "@rivi-software/radiotools-sdk": "workspace:*",
+        "@rivi-software/radiotools-contract": "^0.4.0",
+        "@rivi-software/radiotools-sdk": "^0.4.0",
         "zod": "4.6.5",
       },
     },
@@ -30,7 +30,7 @@
       "name": "@rivi-software/radiotools-sdk-next",
       "version": "0.4.0",
       "dependencies": {
-        "@rivi-software/radiotools-sdk": "workspace:*",
+        "@rivi-software/radiotools-sdk": "^0.4.0",
         "server-only": "0.0.1",
       },
       "devDependencies": {
@@ -45,7 +45,7 @@
       "name": "@rivi-software/radiotools-sdk-react",
       "version": "0.4.0",
       "dependencies": {
-        "@rivi-software/radiotools-sdk": "workspace:*",
+        "@rivi-software/radiotools-sdk": "^0.4.0",
       },
       "devDependencies": {
         "@types/react": "19.3.0",
@@ -60,7 +60,7 @@
       "name": "@rivi-software/radiotools-sdk-svelte",
       "version": "0.4.0",
       "dependencies": {
-        "@rivi-software/radiotools-sdk": "workspace:*",
+        "@rivi-software/radiotools-sdk": "^0.4.0",
       },
       "devDependencies": {
         "svelte": "5.57.2",
@@ -85,7 +85,7 @@
       "name": "@rivi-software/radiotools-sdk-vue",
       "version": "0.4.0",
       "dependencies": {
-        "@rivi-software/radiotools-sdk": "workspace:*",
+        "@rivi-software/radiotools-sdk": "^0.4.0",
       },
       "devDependencies": {
         "typescript": "5.9.3",

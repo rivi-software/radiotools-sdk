@@ -15,7 +15,7 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
-    "@rivi-software/radiotools-sdk": "workspace:*"
+    "@rivi-software/radiotools-sdk": "^0.4.0"
   },
   "peerDependencies": {
     "vue": ">=3.4"

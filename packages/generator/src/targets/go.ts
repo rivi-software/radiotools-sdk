@@ -160,6 +160,9 @@ func (c *StationClient) ReportPlayback(ctx context.Context, observation map[stri
 `;
 }
 
+/** Go requires the module path to be the repository path plus the module's directory. */
+const GO_MODULE = "github.com/rivi-software/radiotools-sdk/packages/sdk-go";
+
 export const goTarget: SdkTarget = {
   id: "go",
   description: "Go net/http client stubs (packages/sdk-go)",
@@ -168,7 +171,7 @@ export const goTarget: SdkTarget = {
     { path: "client.go", contents: renderGoClient() },
     {
       path: "../go.mod",
-      contents: `module github.com/radiotools/radiotools-sdk-go
+      contents: `module ${GO_MODULE}
 
 go 1.22
 `,
@@ -178,6 +181,24 @@ go 1.22
       contents: `# radiotools-sdk-go
 
 Generated Go client stubs for RadioTools listener contract v${listenerSdkManifest.contractVersion}.
+
+## Install
+
+\`\`\`bash
+go get ${GO_MODULE}
+\`\`\`
+
+\`\`\`go
+import "${GO_MODULE}/radiotools"
+
+client, err := radiotools.StationClientFromEnv()
+if err != nil {
+\tlog.Fatal(err)
+}
+weather, err := client.GetWeather(ctx) // nil when the station does not publish weather
+\`\`\`
+
+Releases are tagged \`packages/sdk-go/vX.Y.Z\`. Until the first such tag, \`go get\` resolves the newest commit on \`main\` as a pseudo-version.
 
 Regenerate: \`bun run --filter @rivi-software/radiotools-sdk-generator generate --target go\`
 

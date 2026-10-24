@@ -137,14 +137,14 @@ export const listenerSdkManifest: SdkManifest = {
     {
       name: "getSchedule",
       scope: "listener:read",
-      description: "Broadcast schedule for a date window (1–31 inclusive days).",
+      description: "Broadcast schedule for a date window (1–42 inclusive days).",
       graphqlField: "schedule",
       rest: { method: "GET", pathPattern: "{resources.schedule}", resourceKey: "schedule" },
     },
     {
       name: "getShows",
       scope: "listener:read",
-      description: "Shows on air in a date window (1–31 inclusive days), with their regular slots.",
+      description: "Shows on air in a date window (1–42 inclusive days), with their regular slots.",
       graphqlField: "shows",
       rest: { method: "GET", pathPattern: "{resources.shows}", resourceKey: "shows" },
     },

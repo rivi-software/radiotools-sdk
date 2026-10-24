@@ -137,9 +137,13 @@ export const PublicStation = z.object({
     traffic: href.nullable(),
     media: href,
   }),
+  /**
+   * Delivery hints. The API has deprecated `cache`; both strings are read as any non-empty value so
+   * a station document that sends another caching policy still parses.
+   */
   delivery: z.object({
-    cache: z.literal("no-store"),
-    conditional: z.literal("etag"),
+    cache: z.string().min(1),
+    conditional: z.string().min(1),
     pollIntervalSeconds: z.number().int().positive(),
   }),
 });
