@@ -1,12 +1,15 @@
 scalar JSON
 
+  """
+  Every field but station is nullable: one that fails answers null with its error, and the
+  fields beside it keep their data.
+  """
   type Query {
     station: Station!
-    schemas(type: String, version: Int): [ContentSchema!]!
+    schemas(type: String, version: Int): [ContentSchema!]
     """
     Published records of one type, newest first by default. publishedAt orders by first
     publication, updatedAt by the live version's publication; pass nextCursor to continue.
-    The type key "programs" is a deprecated alias of "shows".
     """
     content(
       type: String!
@@ -15,22 +18,20 @@ scalar JSON
       sort: ContentSort = publishedAt
       direction: SortDirection = desc
       filter: [ContentFilter!]
-    ): ContentCollection!
-    contentRecord(id: ID!): PublishedRecord!
+    ): ContentCollection
+    contentRecord(id: ID!): PublishedRecord
     """
     The record a slug names; a slug it used before resolves to the record as it is now.
     """
-    contentBySlug(type: String!, slug: String!): PublishedRecord!
-    schedule(fromDate: String!, throughDate: String!): Schedule!
+    contentBySlug(type: String!, slug: String!): PublishedRecord
+    schedule(fromDate: String!, throughDate: String!): Schedule
     """
     The shows on air in the window, with their regular slots.
     """
-    shows(fromDate: String!, throughDate: String!): Shows!
-    programs(fromDate: String!, throughDate: String!): Programs!
-      @deprecated(reason: "Use shows, which returns the same shows.")
-    currentBroadcast: CurrentBroadcast!
-    nowPlaying: NowPlaying!
-    trackHistory(cursor: String, limit: Int = 25): TrackHistory!
+    shows(fromDate: String!, throughDate: String!): Shows
+    currentBroadcast: CurrentBroadcast
+    nowPlaying: NowPlaying
+    trackHistory(cursor: String, limit: Int = 25): TrackHistory
     weather: Weather
     traffic: Traffic
   }
@@ -86,7 +87,8 @@ scalar JSON
     content: String
     schedule: String
     shows: String
-    programs: String @deprecated(reason: "Use shows.")
+    programs: String
+      @deprecated(reason: "Always null: the programs alias of shows is removed. Use shows.")
     broadcast: String
     nowPlaying: String
     trackHistory: String
@@ -105,7 +107,11 @@ scalar JSON
   }
 
   type StationDelivery {
-    cache: String!
+    """
+    Always no-store, which older clients require; it is not the cache policy. GraphQL answers
+    are no-store, and each REST response's Cache-Control header is its own policy.
+    """
+    cache: String! @deprecated(reason: "Always no-store. Read each response's Cache-Control.")
     conditional: String!
     pollIntervalSeconds: Int!
   }
@@ -275,40 +281,6 @@ scalar JSON
   A regular slot: weekday 0 = Sunday … 6 = Saturday, startTime is wall time in timezone.
   """
   type ShowSlot {
-    weekday: Int!
-    startTime: String!
-    durationMinutes: Int!
-    timezone: String!
-    intervalWeeks: Int!
-    fromDate: String!
-    throughDate: String!
-    presenters: [BroadcastPresenter!]!
-  }
-
-  """
-  Deprecated: the result of the deprecated programs query. Use shows.
-  """
-  type Programs {
-    contractVersion: Int!
-    timezone: String!
-    fromDate: String!
-    throughDate: String!
-    programs: [ProgramSummary!]!
-    truncated: Boolean!
-  }
-
-  type ProgramSummary {
-    id: ID!
-    title: String!
-    profileId: ID
-    presenters: [BroadcastPresenter!]!
-    slots: [ProgramSlot!]!
-  }
-
-  """
-  A regular slot: weekday 0 = Sunday … 6 = Saturday, startTime is wall time in timezone.
-  """
-  type ProgramSlot {
     weekday: Int!
     startTime: String!
     durationMinutes: Int!
