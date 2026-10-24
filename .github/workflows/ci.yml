@@ -26,6 +26,9 @@ jobs:
       - name: Install
         run: bun install --frozen-lockfile
 
+      - name: Check publishable manifests
+        run: bun run check:manifests
+
       - name: Generate SDK artifacts
         run: bun run generate
 

@@ -32,8 +32,8 @@
     "directory": "packages/generator"
   },
   "dependencies": {
-    "@rivi-software/radiotools-contract": "workspace:*",
-    "@rivi-software/radiotools-sdk": "workspace:*",
+    "@rivi-software/radiotools-contract": "^0.4.0",
+    "@rivi-software/radiotools-sdk": "^0.4.0",
     "zod": "4.6.5"
   }
 }
