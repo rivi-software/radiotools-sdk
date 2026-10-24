@@ -1,6 +1,6 @@
-import type { SdkTarget } from "../types";
-import { pascalCase } from "../shared/naming";
-import { ZERO_ARG_READ_METHODS } from "../shared/reads";
+import type { SdkTarget } from "../types.js";
+import { pascalCase } from "../shared/naming.js";
+import { ZERO_ARG_READ_METHODS } from "../shared/reads.js";
 
 function renderSvelteStores(): string {
   const stores = ZERO_ARG_READ_METHODS.map((method) => {
@@ -74,7 +74,7 @@ export const svelteTarget: SdkTarget = {
     { path: "stores.generated.ts", contents: renderSvelteStores() },
     {
       path: "index.ts",
-      contents: `export * from "./stores.generated";\n`,
+      contents: `export * from "./stores.generated.js";\n`,
     },
   ],
 };

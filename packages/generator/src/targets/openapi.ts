@@ -3,8 +3,8 @@ import {
   buildZodOpenApiComponents,
   jsonSchemaRef,
   operationResponseSchemas,
-} from "../openapi/zod-components";
-import type { SdkTarget } from "../types";
+} from "../openapi/zod-components.js";
+import type { SdkTarget } from "../types.js";
 
 function errorResponseContent() {
   return {

@@ -10,7 +10,7 @@ import {
   type SdkPublishedShow,
   type SdkPublishedShowCollection,
   sdkSchemas,
-} from "./schemas";
+} from "./schemas.js";
 
 /**
  * The four content types every station has, with fields fixed in RadioTools: their records

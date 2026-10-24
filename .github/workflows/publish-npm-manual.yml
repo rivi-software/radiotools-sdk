@@ -50,7 +50,7 @@ jobs:
         run: bun run build
 
       - name: Verify
-        run: bun run check:manifests && bun run check && bun test
+        run: bun run check:manifests && bun run check && bun test && bun run check:packages
 
       - name: Archive prepared packages
         run: tar --exclude=node_modules -czf "$RUNNER_TEMP/prepared-packages.tar.gz" packages

@@ -1,4 +1,4 @@
-import { type SdkErrorCode, type SdkErrorResponse, sdkSchemas } from "./schemas";
+import { type SdkErrorCode, type SdkErrorResponse, sdkSchemas } from "./schemas.js";
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 

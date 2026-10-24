@@ -1,5 +1,5 @@
 import { listenerSdkManifest } from "@rivi-software/radiotools-contract";
-import type { SdkTarget } from "../types";
+import type { SdkTarget } from "../types.js";
 
 function renderPhpClient(): string {
   const playbackPath = listenerSdkManifest.integrations.playback.path;

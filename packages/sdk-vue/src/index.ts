@@ -1,1 +1,1 @@
-export * from "./composables.generated";
+export * from "./composables.generated.js";

@@ -10,7 +10,7 @@ export {
   type SdkClientMethod,
   type SdkEnvVar,
   type SdkManifest,
-} from "./manifest";
+} from "./manifest.js";
 
 const packageDir = dirname(fileURLToPath(import.meta.url));
 

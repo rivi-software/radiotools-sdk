@@ -1,11 +1,11 @@
 import { expect, test } from "bun:test";
-import { createStationClient } from "../src/client";
-import { asContentType } from "../src/content-types";
-import { createEtagCache } from "../src/http";
-import { stationClientOptionsFromEnv } from "../src/env";
-import { readPreviewHandoff } from "../src/preview";
-import { PUBLIC_SOCKET_PROTOCOL, sdkSchemas } from "../src/schemas";
-import { subscribePublicFeed } from "../src/realtime";
+import { createStationClient } from "../src/client.js";
+import { asContentType } from "../src/content-types.js";
+import { createEtagCache } from "../src/http.js";
+import { stationClientOptionsFromEnv } from "../src/env.js";
+import { readPreviewHandoff } from "../src/preview.js";
+import { PUBLIC_SOCKET_PROTOCOL, sdkSchemas } from "../src/schemas.js";
+import { subscribePublicFeed } from "../src/realtime.js";
 
 const stationBody = {
   contractVersion: 1,

@@ -1,5 +1,5 @@
 import { listenerSdkManifest } from "@rivi-software/radiotools-contract";
-import type { SdkTarget } from "../types";
+import type { SdkTarget } from "../types.js";
 
 function renderKotlinClient(): string {
   const manifest = listenerSdkManifest;

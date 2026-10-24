@@ -58,11 +58,15 @@ Only the TypeScript package has GraphQL, WebSocket, ETag and retry support. The 
 ## Development
 
 ```bash
-bun install
+bun install              # also builds every npm package
+bun run generate
+bun run build
 bun run check
 bun test
-bun run generate
+bun run check:packages   # pack each npm package and import it from plain Node
 ```
+
+The npm packages publish compiled JavaScript and type declarations from `dist/`, and the workspace packages resolve each other through `dist/` as well. After changing a package, run `bun run build` before typechecking the packages that depend on it. Relative imports in the TypeScript sources end in `.js`, as Node's ESM resolution requires.
 
 ## Publish to npm
 
@@ -99,11 +103,11 @@ bash scripts/publish-npm-ordered.sh
 
 ### CI
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on pull requests and `main`: `generate`, typecheck, and tests.
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on pull requests and `main`: `generate`, build, typecheck, tests, and `check:packages`, which packs each npm package, installs the tarballs into an empty project and imports them from plain Node.
 
 CI and the `prepare` jobs in both npm workflows use **`depot-ubuntu-24.04`** (x64, 2 vCPU, 8 GB RAM). These SDK jobs are small: the successful CI run [38193029375](https://github.com/rivi-software/radiotools-sdk/actions/runs/38193029375) completed its job in 19 seconds, including a 9-second typecheck, on GitHub's previous runner. Two CPUs are the initial cost-conscious choice; this is a baseline, not a measured Depot speedup. Ubuntu 24.04 and x64 keep the OS and native tool architecture consistent.
 
-The npm workflows generate, build, typecheck and test on Depot, then transfer prepared packages as a one-day artifact to their final `release` or `publish` job on **GitHub-hosted `ubuntu-24.04`**. The archive excludes `node_modules` and preserves file permissions. Only a successful preparation job permits publishing. The final jobs retain their npm authentication and OIDC permissions: [npm trusted publishing currently requires GitHub-hosted runners](https://docs.npmjs.com/trusted-publishers/). The automated release uses the prepared files directly rather than repeating generation and verification; local `bun run release-packages` still performs all checks.
+The npm workflows generate, build, typecheck, test and run `check:packages` on Depot, then transfer prepared packages as a one-day artifact to their final `release` or `publish` job on **GitHub-hosted `ubuntu-24.04`**. The archive excludes `node_modules` and preserves file permissions. Only a successful preparation job permits publishing. The final jobs retain their npm authentication and OIDC permissions: [npm trusted publishing currently requires GitHub-hosted runners](https://docs.npmjs.com/trusted-publishers/). The automated release uses the prepared files directly rather than repeating generation and verification; local `bun run release-packages` still performs all checks.
 
 Before merging, an organization owner must [connect Depot's GitHub App](https://depot.dev/docs/github-actions/quickstart) to `rivi-software/radiotools-sdk` and approve repository access. For a public repository, its Actions runner group must also allow public repositories. Without this setup, Depot jobs remain queued. Runner labels are registered in [`.github/actionlint.yaml`](.github/actionlint.yaml) for workflow linting. GitHub-managed default CodeQL and Dependabot workflows are outside these repository workflow files.
 

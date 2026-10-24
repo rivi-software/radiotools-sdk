@@ -1,6 +1,6 @@
 import { listenerSdkManifest } from "@rivi-software/radiotools-contract";
-import { snakeCase } from "../shared/naming";
-import type { SdkTarget } from "../types";
+import { snakeCase } from "../shared/naming.js";
+import type { SdkTarget } from "../types.js";
 
 /** The four content types every station has; their reads return typed records. */
 const DEFAULT_TYPES = [

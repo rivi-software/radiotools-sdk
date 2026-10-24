@@ -7,17 +7,19 @@
   "bin": {
     "radiotools-sdk-generate": "./dist/cli.js"
   },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "default": "./dist/index.js"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && node --input-type=module -e \"import { readFileSync, writeFileSync } from 'node:fs'; for (const f of ['cli.js','index.js']) { const p='dist/'+f; writeFileSync(p, '#!/usr/bin/env node\\n'+readFileSync(p)); }\"",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "prepublishOnly": "bun run build",
     "check": "tsc --noEmit",
     "generate": "bun src/cli.ts generate --target all",

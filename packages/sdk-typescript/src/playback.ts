@@ -1,10 +1,10 @@
-import type { FetchLike } from "./http";
-import { postJson } from "./http";
+import type { FetchLike } from "./http.js";
+import { postJson } from "./http.js";
 import {
   type SdkPlaybackObservation,
   type SdkPlaybackObservationResult,
   sdkSchemas,
-} from "./schemas";
+} from "./schemas.js";
 
 const MAX_PLAYBACK_BODY_BYTES = 8192;
 

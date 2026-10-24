@@ -9,13 +9,14 @@
   "scripts": {
     "check": "bun run --filter '*' check",
     "check:manifests": "bun scripts/check-publish-manifests.ts",
+    "check:packages": "bash scripts/check-packed-imports.sh",
     "test": "bun run --filter @rivi-software/radiotools-sdk test",
     "generate": "bun run --filter @rivi-software/radiotools-sdk-generator generate --target all",
-    "build": "bun run --filter @rivi-software/radiotools-sdk-generator build",
-    "postinstall": "bun run --filter @rivi-software/radiotools-sdk-generator build",
+    "build": "bun run --filter './packages/*' build",
+    "postinstall": "bun run build",
     "changeset": "changeset",
     "version-packages": "changeset version && bun install",
-    "release-packages": "bun run check:manifests && bun run generate && bun run build && bun run check && bun test && changeset publish"
+    "release-packages": "bun run check:manifests && bun run generate && bun run build && bun run check && bun test && bun run check:packages && changeset publish"
   },
   "devDependencies": {
     "@changesets/cli": "2.29.2",

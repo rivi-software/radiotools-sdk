@@ -1,6 +1,6 @@
-import type { PublicJsonRequestOptions } from "./http";
-import { postJson, RadioToolsApiError } from "./http";
-import { type SdkPublishedCollection, type SdkPublishedRecord, sdkSchemas } from "./schemas";
+import type { PublicJsonRequestOptions } from "./http.js";
+import { postJson, RadioToolsApiError } from "./http.js";
+import { type SdkPublishedCollection, type SdkPublishedRecord, sdkSchemas } from "./schemas.js";
 
 export type GraphqlRequestOptions = PublicJsonRequestOptions & {
   previewGrant?: string;

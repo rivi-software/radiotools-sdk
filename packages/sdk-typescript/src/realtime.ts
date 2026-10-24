@@ -7,7 +7,7 @@ import {
   type SdkPublicSocketEvent,
   type SdkPublishedRecord,
   sdkSchemas,
-} from "./schemas";
+} from "./schemas.js";
 
 export type PublicFeedHandlers = {
   onSchedule?: (data: SdkPublicSchedule) => void;

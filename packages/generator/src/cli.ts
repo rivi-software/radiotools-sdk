@@ -1,8 +1,8 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { generateSdks, listTargets } from "./engine";
-import type { GeneratorTarget } from "./types";
+import { generateSdks, listTargets } from "./engine.js";
+import type { GeneratorTarget } from "./types.js";
 
 function repoRootFromImportMeta(metaUrl: string): string {
   const here = dirname(fileURLToPath(metaUrl));

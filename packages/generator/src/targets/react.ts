@@ -1,5 +1,5 @@
-import type { SdkTarget } from "../types";
-import { hookNameFromMethod, ZERO_ARG_READ_METHODS } from "../shared/reads";
+import type { SdkTarget } from "../types.js";
+import { hookNameFromMethod, ZERO_ARG_READ_METHODS } from "../shared/reads.js";
 
 function renderReactHooks(): string {
   const hooks = ZERO_ARG_READ_METHODS.map((method) => {
@@ -87,7 +87,7 @@ export const reactTarget: SdkTarget = {
     },
     {
       path: "index.ts",
-      contents: `export * from "./hooks.generated";
+      contents: `export * from "./hooks.generated.js";
 `,
     },
   ],

@@ -8,7 +8,7 @@ export {
   type StationClient,
   type StationClientTransport,
   type TrackHistoryOptions,
-} from "./client";
+} from "./client.js";
 export {
   asContentType,
   DEFAULT_CONTENT_TYPES,
@@ -16,17 +16,17 @@ export {
   isDefaultContentType,
   type SdkPublishedCollectionOf,
   type SdkPublishedRecordOf,
-} from "./content-types";
-export { createStationClientFromEnv, type RadioToolsEnv, stationClientOptionsFromEnv } from "./env";
-export { type EtagCache, type FetchLike, RadioToolsApiError, createEtagCache } from "./http";
-export { type PublicMediaVariant, publicMediaUrl } from "./media";
-export { type ReportPlaybackOptions, reportPlayback } from "./playback";
+} from "./content-types.js";
+export { createStationClientFromEnv, type RadioToolsEnv, stationClientOptionsFromEnv } from "./env.js";
+export { type EtagCache, type FetchLike, RadioToolsApiError, createEtagCache } from "./http.js";
+export { type PublicMediaVariant, publicMediaUrl } from "./media.js";
+export { type ReportPlaybackOptions, reportPlayback } from "./playback.js";
 export {
   type PreviewEditorialOptions,
   type PreviewHandoff,
   previewEditorial,
   readPreviewHandoff,
-} from "./preview";
+} from "./preview.js";
 export {
   type PublicFeedHandlers,
   type PublicFeedSubscription,
@@ -35,7 +35,7 @@ export {
   type SubscribePublicFeedOptions,
   secureFeedUrl,
   subscribePublicFeed,
-} from "./realtime";
+} from "./realtime.js";
 export {
   isSafeHref,
   LISTENER_CONTRACT_VERSION,
@@ -74,4 +74,4 @@ export {
   type SdkTrafficPublic,
   type SdkWeatherPublic,
   sdkSchemas,
-} from "./schemas";
+} from "./schemas.js";
