@@ -175,6 +175,22 @@ test("getTraffic reads the station traffic resource", async () => {
   expect((await client.getTraffic())?.snapshot.watch.roads[0]?.code).toBe("A12");
 });
 
+test("station documents with other delivery strings still parse", async () => {
+  const delivery = {
+    cache: "public, max-age=30, stale-while-revalidate=30",
+    conditional: "etag",
+    pollIntervalSeconds: 30,
+  };
+  const client = createStationClient({
+    baseUrl: "https://radio.example",
+    stationSlug: "station-a",
+    apiToken: "fixture-api-token",
+    fetch: async () => Response.json({ ...stationBody, delivery }),
+  });
+  expect((await client.getStation()).delivery).toEqual(delivery);
+  expect(await client.recommendedPollIntervalMs()).toBe(30_000);
+});
+
 test("schedule windows stay within 42 inclusive days", async () => {
   const requested: string[] = [];
   const client = createStationClient({

@@ -522,11 +522,11 @@
             "properties": {
               "cache": {
                 "type": "string",
-                "const": "no-store"
+                "minLength": 1
               },
               "conditional": {
                 "type": "string",
-                "const": "etag"
+                "minLength": 1
               },
               "pollIntervalSeconds": {
                 "type": "integer",
