@@ -4,14 +4,20 @@
   "description": "Svelte stores for @rivi-software/radiotools-sdk (generated from @rivi-software/radiotools-contract)",
   "license": "MIT",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "files": [
-    "src"
+    "dist"
   ],
   "sideEffects": false,
   "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "check": "tsc --noEmit"
   },
   "dependencies": {

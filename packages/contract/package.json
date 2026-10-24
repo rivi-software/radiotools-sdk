@@ -4,15 +4,21 @@
   "description": "RadioTools listener API contract (manifest and GraphQL schema)",
   "license": "MIT",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
     "./graphql": "./graphql/schema.graphql"
   },
   "files": [
-    "src",
+    "dist",
     "graphql"
   ],
   "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "check": "tsc --noEmit"
   },
   "publishConfig": {

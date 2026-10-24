@@ -1,7 +1,7 @@
-import { graphqlRequest, parseGraphqlPreview, previewMutation } from "./graphql";
-import type { FetchLike } from "./http";
-import { postJson } from "./http";
-import { type SdkPreviewInput, type SdkRevisionPreview, sdkSchemas } from "./schemas";
+import { graphqlRequest, parseGraphqlPreview, previewMutation } from "./graphql.js";
+import type { FetchLike } from "./http.js";
+import { postJson } from "./http.js";
+import { type SdkPreviewInput, type SdkRevisionPreview, sdkSchemas } from "./schemas.js";
 
 export type PreviewEditorialOptions = {
   baseUrl: string;

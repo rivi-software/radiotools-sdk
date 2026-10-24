@@ -1,4 +1,4 @@
-import { type CreateStationClientOptions, createStationClient, type StationClient } from "./client";
+import { type CreateStationClientOptions, createStationClient, type StationClient } from "./client.js";
 
 export type RadioToolsEnv = {
   RADIOTOOLS_BASE_URL?: string;

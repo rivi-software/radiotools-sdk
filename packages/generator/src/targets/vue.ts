@@ -1,5 +1,5 @@
-import type { SdkTarget } from "../types";
-import { hookNameFromMethod, ZERO_ARG_READ_METHODS } from "../shared/reads";
+import type { SdkTarget } from "../types.js";
+import { hookNameFromMethod, ZERO_ARG_READ_METHODS } from "../shared/reads.js";
 
 function renderVueComposables(): string {
   const composables = ZERO_ARG_READ_METHODS.map((method) => {
@@ -66,6 +66,6 @@ export const vueTarget: SdkTarget = {
   outputDir: (repoRoot) => `${repoRoot}/packages/sdk-vue/src`,
   generate: () => [
     { path: "composables.generated.ts", contents: renderVueComposables() },
-    { path: "index.ts", contents: `export * from "./composables.generated";\n` },
+    { path: "index.ts", contents: `export * from "./composables.generated.js";\n` },
   ],
 };

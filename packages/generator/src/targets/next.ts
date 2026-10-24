@@ -1,5 +1,5 @@
-import { ZERO_ARG_READ_METHODS } from "../shared/reads";
-import type { SdkTarget } from "../types";
+import { ZERO_ARG_READ_METHODS } from "../shared/reads.js";
+import type { SdkTarget } from "../types.js";
 
 function renderNextServerHelpers(): string {
   const cachedReads = ZERO_ARG_READ_METHODS.map((method) => {
@@ -28,8 +28,9 @@ import {
   type CreateStationClientOptions,
   type StationClient,
 } from "@rivi-software/radiotools-sdk";
-import { unstable_cache } from "next/cache";
-import { NextResponse } from "next/server";
+// next has no "exports" map, so ESM resolution (Node, webpack) needs the file extension.
+import { unstable_cache } from "next/cache.js";
+import { NextResponse } from "next/server.js";
 
 const DEFAULT_REVALIDATE_SECONDS = 30;
 
@@ -78,7 +79,7 @@ export const nextTarget: SdkTarget = {
     { path: "server.generated.ts", contents: renderNextServerHelpers() },
     {
       path: "index.ts",
-      contents: `export * from "./server.generated";
+      contents: `export * from "./server.generated.js";
 `,
     },
   ],

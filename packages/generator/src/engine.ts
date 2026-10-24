@@ -1,18 +1,18 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join } from "node:path";
-import { csharpTarget } from "./targets/csharp";
-import { goTarget } from "./targets/go";
-import { kotlinTarget } from "./targets/kotlin";
-import { nextTarget } from "./targets/next";
-import { openapiTarget } from "./targets/openapi";
-import { phpTarget } from "./targets/php";
-import { pythonTarget } from "./targets/python";
-import { reactTarget } from "./targets/react";
-import { rubyTarget } from "./targets/ruby";
-import { svelteTarget } from "./targets/svelte";
-import { swiftTarget } from "./targets/swift";
-import { vueTarget } from "./targets/vue";
-import type { GenerateOptions, GeneratedFile, GeneratorTarget, SdkTarget } from "./types";
+import { csharpTarget } from "./targets/csharp.js";
+import { goTarget } from "./targets/go.js";
+import { kotlinTarget } from "./targets/kotlin.js";
+import { nextTarget } from "./targets/next.js";
+import { openapiTarget } from "./targets/openapi.js";
+import { phpTarget } from "./targets/php.js";
+import { pythonTarget } from "./targets/python.js";
+import { reactTarget } from "./targets/react.js";
+import { rubyTarget } from "./targets/ruby.js";
+import { svelteTarget } from "./targets/svelte.js";
+import { swiftTarget } from "./targets/swift.js";
+import { vueTarget } from "./targets/vue.js";
+import type { GenerateOptions, GeneratedFile, GeneratorTarget, SdkTarget } from "./types.js";
 
 const targets: SdkTarget[] = [
   pythonTarget,

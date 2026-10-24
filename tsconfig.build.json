@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "rootDir": "${configDir}/src",
+    "outDir": "${configDir}/dist"
+  },
+  "include": ["${configDir}/src"]
+}

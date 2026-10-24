@@ -26,19 +26,19 @@ import {
   trackHistoryQuery,
   trafficQuery,
   weatherQuery,
-} from "./graphql";
+} from "./graphql.js";
 import {
   collectionParser,
   recordParser,
   type SdkPublishedCollectionOf,
   type SdkPublishedRecordOf,
-} from "./content-types";
-import type { EtagCache, FetchLike, PublicJsonRequestOptions } from "./http";
-import { readPublicJson } from "./http";
-import { reportPlayback } from "./playback";
-import { previewEditorial } from "./preview";
-import type { PublicFeedHandlers, PublicFeedSubscription } from "./realtime";
-import { type SubscribePublicFeedOptions, subscribePublicFeed } from "./realtime";
+} from "./content-types.js";
+import type { EtagCache, FetchLike, PublicJsonRequestOptions } from "./http.js";
+import { readPublicJson } from "./http.js";
+import { reportPlayback } from "./playback.js";
+import { previewEditorial } from "./preview.js";
+import type { PublicFeedHandlers, PublicFeedSubscription } from "./realtime.js";
+import { type SubscribePublicFeedOptions, subscribePublicFeed } from "./realtime.js";
 import type {
   SdkPlaybackObservation,
   SdkPlaybackObservationResult,
@@ -55,8 +55,8 @@ import type {
   SdkRevisionPreview,
   SdkTrafficPublic,
   SdkWeatherPublic,
-} from "./schemas";
-import { sdkSchemas } from "./schemas";
+} from "./schemas.js";
+import { sdkSchemas } from "./schemas.js";
 
 export type StationClientTransport = "http" | "graphql" | "auto";
 
