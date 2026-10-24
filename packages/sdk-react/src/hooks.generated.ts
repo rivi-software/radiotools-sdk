@@ -11,38 +11,46 @@ type QueryState<T> = {
 
 function useStationQuery<T>(
   client: StationClient,
-  _method: string,
+  method: string,
   read: () => Promise<T>,
 ): QueryState<T> {
   const [data, setData] = useState<T | undefined>(undefined);
   const [error, setError] = useState<Error | undefined>(undefined);
   const [loading, setLoading] = useState(true);
-  const mounted = useRef(true);
+  // Each render passes a new `read` arrow; keep the latest in a ref so it does not restart the query.
+  const readRef = useRef(read);
+  // Bumped by every request and on cleanup: only the newest request may write state.
+  const generation = useRef(0);
+
+  useEffect(() => {
+    readRef.current = read;
+  });
 
   const refresh = useCallback(() => {
+    const request = ++generation.current;
     setLoading(true);
-    void read()
+    void readRef
+      .current()
       .then((value) => {
-        if (!mounted.current) return;
+        if (request !== generation.current) return;
         setData(value);
         setError(undefined);
       })
       .catch((cause: unknown) => {
-        if (!mounted.current) return;
+        if (request !== generation.current) return;
         setError(cause instanceof Error ? cause : new Error(String(cause)));
       })
       .finally(() => {
-        if (mounted.current) setLoading(false);
+        if (request === generation.current) setLoading(false);
       });
-  }, [read]);
+  }, []);
 
   useEffect(() => {
-    mounted.current = true;
     refresh();
     return () => {
-      mounted.current = false;
+      generation.current += 1;
     };
-  }, [refresh]);
+  }, [client, method, refresh]);
 
   return { data, error, loading, refresh };
 }
