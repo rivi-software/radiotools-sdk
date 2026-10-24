@@ -175,18 +175,37 @@ test("getTraffic reads the station traffic resource", async () => {
   expect((await client.getTraffic())?.snapshot.watch.roads[0]?.code).toBe("A12");
 });
 
-test("schedule windows stay within 31 inclusive days", async () => {
+test("schedule windows stay within 42 inclusive days", async () => {
+  const requested: string[] = [];
   const client = createStationClient({
     baseUrl: "https://radio.example",
     stationSlug: "station-a",
     apiToken: "fixture-api-token",
-    fetch: async () => {
-      throw new Error("invalid windows must not be requested");
+    fetch: async (input) => {
+      const url = new URL(input);
+      requested.push(`${url.pathname}${url.search}`);
+      if (url.pathname.endsWith("/schedule")) {
+        return Response.json({
+          contractVersion: 1,
+          timezone: "Europe/Amsterdam",
+          broadcasts: [],
+          truncated: false,
+        });
+      }
+      return Response.json(stationBody);
     },
   });
+  const schedule = await client.getSchedule({ fromDate: "2026-10-01", throughDate: "2026-11-11" });
+  expect(schedule.broadcasts).toEqual([]);
+  expect(requested).toContain(
+    "/api/v1/stations/station-a/schedule?fromDate=2026-10-01&throughDate=2026-11-11",
+  );
+
+  requested.length = 0;
   await expect(
-    client.getSchedule({ fromDate: "2026-10-01", throughDate: "2026-11-01" }),
-  ).rejects.toThrow(/31 inclusive days/);
+    client.getSchedule({ fromDate: "2026-10-01", throughDate: "2026-11-12" }),
+  ).rejects.toThrow(/42 inclusive days/);
+  expect(requested).toEqual([]);
 });
 
 const feedChannel = "databases.station.tables.public_station_feed.rows";

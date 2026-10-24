@@ -212,6 +212,9 @@ function isRealDate(value: string): boolean {
   );
 }
 
+/** The longest schedule window the listener API accepts, counting both end dates. */
+const MAX_SCHEDULE_WINDOW_DAYS = 42;
+
 function assertScheduleWindow(window: ScheduleWindow): void {
   if (!isRealDate(window.fromDate) || !isRealDate(window.throughDate)) {
     throw new Error("Schedule dates must be YYYY-MM-DD");
@@ -219,8 +222,8 @@ function assertScheduleWindow(window: ScheduleWindow): void {
   const from = Date.parse(`${window.fromDate}T00:00:00.000Z`);
   const through = Date.parse(`${window.throughDate}T00:00:00.000Z`);
   const inclusiveDays = Math.round((through - from) / 86_400_000) + 1;
-  if (inclusiveDays < 1 || inclusiveDays > 31) {
-    throw new Error("Schedule window must cover 1 to 31 inclusive days");
+  if (inclusiveDays < 1 || inclusiveDays > MAX_SCHEDULE_WINDOW_DAYS) {
+    throw new Error(`Schedule window must cover 1 to ${MAX_SCHEDULE_WINDOW_DAYS} inclusive days`);
   }
 }
 
