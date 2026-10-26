@@ -1,6 +1,6 @@
 {
   "name": "@rivi-software/radiotools-contract",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "RadioTools listener API contract (manifest and GraphQL schema)",
   "license": "MIT",
   "type": "module",
