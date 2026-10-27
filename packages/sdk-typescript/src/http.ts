@@ -142,6 +142,8 @@ export async function postJson<T>(
     credentials?: RequestCredentials;
     retries?: number;
     rawBody?: string;
+    /** The error an unsuccessful response's JSON body describes; null throws the default error. */
+    errorFor?: (body: unknown) => Error | null;
   } = {},
 ): Promise<T> {
   const call = init.fetch ?? fetch;
@@ -162,6 +164,11 @@ export async function postJson<T>(
     },
     init.retries ?? 2,
   );
-  if (!response.ok) throwResponseError(response.status, await readErrorBody(response));
+  if (!response.ok) {
+    const errorBody = await readErrorBody(response);
+    const error = init.errorFor?.(errorBody);
+    if (error) throw error;
+    throwResponseError(response.status, errorBody);
+  }
   return schema.parse(await response.json());
 }

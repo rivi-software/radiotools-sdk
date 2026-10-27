@@ -49,7 +49,6 @@ export {
   type SdkPublicMedia,
   type SdkPublicNowPlaying,
   type SdkPublicOnAir,
-  type SdkPublicPrograms,
   type SdkPublicProgramSlot,
   type SdkPublicRealtimeDescriptor,
   type SdkPublicSchedule,

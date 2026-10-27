@@ -149,14 +149,6 @@ export const listenerSdkManifest: SdkManifest = {
       rest: { method: "GET", pathPattern: "{resources.shows}", resourceKey: "shows" },
     },
     {
-      name: "getPrograms",
-      scope: "listener:read",
-      description: "Deprecated: use getShows, which returns the same shows.",
-      deprecated: true,
-      graphqlField: "programs",
-      rest: { method: "GET", pathPattern: "{resources.programs}", resourceKey: "programs" },
-    },
-    {
       name: "getCurrentBroadcast",
       scope: "listener:read",
       description: "Current on-air broadcast state.",
