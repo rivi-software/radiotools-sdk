@@ -123,10 +123,6 @@ function renderOpenApi(): string {
         { name: "fromDate", required: true, schema: { type: "string", format: "date" } },
         { name: "throughDate", required: true, schema: { type: "string", format: "date" } },
       ],
-      getPrograms: [
-        { name: "fromDate", required: true, schema: { type: "string", format: "date" } },
-        { name: "throughDate", required: true, schema: { type: "string", format: "date" } },
-      ],
       getTrackHistory: [
         { name: "cursor", schema: { type: "string" } },
         { name: "limit", schema: { type: "integer", minimum: 1, maximum: 50, default: 25 } },

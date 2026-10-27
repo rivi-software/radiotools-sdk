@@ -9,7 +9,6 @@ import {
   parseGraphqlContent,
   parseGraphqlCurrentBroadcast,
   parseGraphqlNowPlaying,
-  parseGraphqlPrograms,
   parseGraphqlRecord,
   parseGraphqlSchedule,
   parseGraphqlSchemas,
@@ -18,7 +17,6 @@ import {
   parseGraphqlTrackHistory,
   parseGraphqlTraffic,
   parseGraphqlWeather,
-  programsQuery,
   scheduleQuery,
   schemasQuery,
   showsQuery,
@@ -45,7 +43,6 @@ import type {
   SdkPreviewInput,
   SdkPublicCurrentBroadcast,
   SdkPublicNowPlaying,
-  SdkPublicPrograms,
   SdkPublicSchedule,
   SdkPublicSchemaList,
   SdkPublicShows,
@@ -169,8 +166,6 @@ export type StationClient = {
   getSchedule: (window: ScheduleWindow) => Promise<SdkPublicSchedule>;
   /** The shows on air in the window, with their regular slots and presenters. */
   getShows: (window: ScheduleWindow) => Promise<SdkPublicShows>;
-  /** @deprecated Use `getShows`, which returns the same shows; `programs` is removed in a later release. */
-  getPrograms: (window: ScheduleWindow) => Promise<SdkPublicPrograms>;
   getCurrentBroadcast: () => Promise<SdkPublicCurrentBroadcast>;
   getNowPlaying: () => Promise<SdkPublicNowPlaying>;
   getTrackHistory: (options?: TrackHistoryOptions) => Promise<SdkPublicTrackHistory>;
@@ -292,7 +287,7 @@ export function createStationClient(options: CreateStationClientOptions): Statio
   };
 
   const stationFor = async (
-    resource: Exclude<keyof SdkPublicStation["resources"], "realtime">,
+    resource: Exclude<keyof SdkPublicStation["resources"], "realtime" | "programs">,
     name: string,
   ) => {
     const station = stationCache ?? (await getStation());
@@ -478,31 +473,6 @@ export function createStationClient(options: CreateStationClientOptions): Statio
     );
   };
 
-  const getPrograms = async (window: ScheduleWindow): Promise<SdkPublicPrograms> => {
-    assertScheduleWindow(window);
-    const { href } = await stationFor("programs", "programs");
-    return preferGraphql(
-      async () => {
-        const data = await graphqlRequest<{ programs: unknown }>(
-          graphqlEndpoint,
-          programsQuery,
-          window,
-          httpOptions,
-        );
-        return parseGraphqlPrograms(data);
-      },
-      async () => {
-        const params = new URLSearchParams(window);
-        const { data } = await readPublicJson(
-          absoluteUrl(options.baseUrl, `${href}?${params}`),
-          sdkSchemas.PublicPrograms,
-          httpOptions,
-        );
-        return data;
-      },
-    );
-  };
-
   const getCurrentBroadcast = async (): Promise<SdkPublicCurrentBroadcast> => {
     const { href } = await stationFor("broadcast", "broadcast");
     return preferGraphql(
@@ -650,7 +620,6 @@ export function createStationClient(options: CreateStationClientOptions): Statio
     iterateContent,
     getSchedule,
     getShows,
-    getPrograms,
     getCurrentBroadcast,
     getNowPlaying,
     getTrackHistory,

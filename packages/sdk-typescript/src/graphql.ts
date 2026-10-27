@@ -6,10 +6,21 @@ export type GraphqlRequestOptions = PublicJsonRequestOptions & {
   previewGrant?: string;
 };
 
+type GraphqlError = { message: string; extensions?: { code?: string } };
+
 type GraphqlEnvelope<T> = {
   data?: T;
-  errors?: { message: string; extensions?: { code?: string } }[];
+  errors?: GraphqlError[];
 };
+
+function graphqlError(errors: GraphqlError[]): Error {
+  const code = errors[0]?.extensions?.code ?? "INTERNAL_ERROR";
+  return Object.assign(new Error(errors[0]?.message ?? "GraphQL error"), {
+    name: "RadioToolsGraphqlError",
+    code,
+    errors,
+  });
+}
 
 export async function graphqlRequest<TData>(
   endpoint: string,
@@ -30,16 +41,14 @@ export async function graphqlRequest<TData>(
       cache: options.cache ?? "no-store",
       credentials: options.credentials ?? "omit",
       retries: options.retries,
+      // When no selected field answered, the API sends the errors with the most severe one's status.
+      errorFor: (value) => {
+        const errors = (value as GraphqlEnvelope<TData> | null)?.errors;
+        return Array.isArray(errors) && errors.length ? graphqlError(errors) : null;
+      },
     },
   );
-  if (body.errors?.length) {
-    const code = body.errors[0]?.extensions?.code ?? "INTERNAL_ERROR";
-    throw Object.assign(new Error(body.errors[0]?.message ?? "GraphQL error"), {
-      name: "RadioToolsGraphqlError",
-      code,
-      errors: body.errors,
-    });
-  }
+  if (body.errors?.length) throw graphqlError(body.errors);
   if (!body.data) throw new Error("GraphQL response missing data");
   return body.data;
 }
@@ -119,7 +128,6 @@ export const stationQuery = /* GraphQL */ `
         content
         schedule
         shows
-        programs
         broadcast
         nowPlaying
         trackHistory
@@ -259,35 +267,6 @@ export const showsQuery = /* GraphQL */ `
   }
 `;
 
-/** @deprecated `programs` is the deprecated alias of `shows`; use `showsQuery`. */
-export const programsQuery = /* GraphQL */ `
-  query SdkPrograms($fromDate: String!, $throughDate: String!) {
-    programs(fromDate: $fromDate, throughDate: $throughDate) {
-      contractVersion
-      timezone
-      fromDate
-      throughDate
-      truncated
-      programs {
-        id
-        title
-        profileId
-        presenters { id title }
-        slots {
-          weekday
-          startTime
-          durationMinutes
-          timezone
-          intervalWeeks
-          fromDate
-          throughDate
-          presenters { id title }
-        }
-      }
-    }
-  }
-`;
-
 export const currentBroadcastQuery = /* GraphQL */ `
   query SdkCurrentBroadcast {
     currentBroadcast {
@@ -368,10 +347,6 @@ export function parseGraphqlSchedule(data: { schedule: unknown }) {
 
 export function parseGraphqlShows(data: { shows: unknown }) {
   return sdkSchemas.PublicShows.parse(data.shows);
-}
-
-export function parseGraphqlPrograms(data: { programs: unknown }) {
-  return sdkSchemas.PublicPrograms.parse(data.programs);
 }
 
 export function parseGraphqlCurrentBroadcast(data: { currentBroadcast: unknown }) {

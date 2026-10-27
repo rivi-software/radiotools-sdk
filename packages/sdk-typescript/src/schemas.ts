@@ -126,8 +126,8 @@ export const PublicStation = z.object({
     schedule: href.nullable(),
     /** The shows with their regular slots. */
     shows: href.nullable(),
-    /** @deprecated Use `shows`, which serves the same shows; `programs` is removed in a later release. */
-    programs: href.nullable(),
+    /** @deprecated Always null: the API removed the `programs` alias of `shows`. Use `shows`. */
+    programs: href.nullable().optional(),
     broadcast: href.nullable(),
     nowPlaying: href.nullable(),
     trackHistory: href.nullable(),
@@ -618,15 +618,6 @@ export const PublicShows = z.object({
   shows: z.array(PublicProgram).max(500),
   truncated: z.boolean(),
 });
-/** @deprecated The `programs` response, the same shows under `programs`. Use `PublicShows`. */
-export const PublicPrograms = z.object({
-  contractVersion: ListenerContractVersion,
-  timezone: Timezone,
-  fromDate: LocalDate,
-  throughDate: LocalDate,
-  programs: z.array(PublicProgram).max(500),
-  truncated: z.boolean(),
-});
 export const PublicCurrentBroadcast = z.object({
   contractVersion: ListenerContractVersion,
   timezone: Timezone,
@@ -998,7 +989,6 @@ export const sdkSchemas = {
   PublishedPageCollection,
   PublicSchedule,
   PublicShows,
-  PublicPrograms,
   PublicCurrentBroadcast,
   WeatherPublic,
   TrafficPublic,
@@ -1033,8 +1023,6 @@ export type SdkPublishedPageCollection = z.infer<typeof PublishedPageCollection>
 export type SdkPublicMedia = z.infer<typeof PublicMedia>;
 export type SdkPublicSchedule = z.infer<typeof PublicSchedule>;
 export type SdkPublicShows = z.infer<typeof PublicShows>;
-/** @deprecated Use `SdkPublicShows`. */
-export type SdkPublicPrograms = z.infer<typeof PublicPrograms>;
 export type SdkPublicProgramSlot = z.infer<typeof PublicProgramSlot>;
 export type SdkPublicCurrentBroadcast = z.infer<typeof PublicCurrentBroadcast>;
 export type SdkWeatherPublic = z.infer<typeof WeatherPublic>;

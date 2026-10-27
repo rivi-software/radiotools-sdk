@@ -23,4 +23,4 @@ page = client.get_content_by_slug("pages", "about-us")
 shows = client.get_shows("2026-10-21", "2026-10-27")
 ```
 
-`get_programs` is the deprecated alias of `get_shows`. For GraphQL, WebSocket, ETag, and retry behavior, use `@rivi-software/radiotools-sdk` (TypeScript).
+For GraphQL, WebSocket, ETag, and retry behavior, use `@rivi-software/radiotools-sdk` (TypeScript).

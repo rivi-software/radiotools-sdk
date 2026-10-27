@@ -19,7 +19,7 @@ const stationBody = {
     content: "/api/v1/stations/station-a/content",
     schedule: "/api/v1/stations/station-a/schedule",
     shows: "/api/v1/stations/station-a/shows",
-    programs: "/api/v1/stations/station-a/programs",
+    programs: null,
     broadcast: "/api/v1/stations/station-a/broadcast/current",
     nowPlaying: "/api/v1/stations/station-a/now-playing",
     trackHistory: "/api/v1/stations/station-a/track-history",
@@ -558,15 +558,8 @@ test("default content types come typed; other types keep the generic record", as
     expect(record.values.website).toBeUndefined();
 });
 
-test("getShows reads the shows resource; getPrograms still reads its alias", async () => {
+test("getShows reads the shows resource", async () => {
   const paths: string[] = [];
-  const shows = {
-    contractVersion: 1,
-    timezone: "Europe/Amsterdam",
-    fromDate: "2026-10-21",
-    throughDate: "2026-10-27",
-    truncated: false,
-  };
   const client = createStationClient({
     baseUrl: "https://radio.example",
     stationSlug: "station-a",
@@ -575,17 +568,29 @@ test("getShows reads the shows resource; getPrograms still reads its alias", asy
       const url = new URL(String(input));
       paths.push(`${url.pathname}${url.search}`);
       if (url.pathname.endsWith("/stations/station-a")) return Response.json(stationBody);
-      if (url.pathname.endsWith("/shows")) return Response.json({ ...shows, shows: [] });
-      return Response.json({ ...shows, programs: [] });
+      return Response.json({
+        contractVersion: 1,
+        timezone: "Europe/Amsterdam",
+        fromDate: "2026-10-21",
+        throughDate: "2026-10-27",
+        shows: [],
+        truncated: false,
+      });
     },
   });
   const window = { fromDate: "2026-10-21", throughDate: "2026-10-27" };
   expect((await client.getShows(window)).shows).toEqual([]);
-  expect((await client.getPrograms(window)).programs).toEqual([]);
   expect(paths.slice(1)).toEqual([
     "/api/v1/stations/station-a/shows?fromDate=2026-10-21&throughDate=2026-10-27",
-    "/api/v1/stations/station-a/programs?fromDate=2026-10-21&throughDate=2026-10-27",
   ]);
+});
+
+test("a station document with or without the removed programs link parses", () => {
+  const { programs: _, ...resources } = stationBody.resources;
+  expect(sdkSchemas.PublicStation.parse({ ...stationBody, resources }).resources.shows).toBe(
+    "/api/v1/stations/station-a/shows",
+  );
+  expect(sdkSchemas.PublicStation.parse(stationBody).resources.programs).toBeNull();
 });
 
 test("GraphQL reads shows and the station's shows link", async () => {
@@ -653,13 +658,13 @@ test("station profile, programme slots and traffic causes parse", () => {
   expect(station.profile?.social[0]?.network).toBe("instagram");
 
   const presenter = { id: "00000000-0000-4000-8000-000000000021", title: "Anna" };
-  const programs = sdkSchemas.PublicPrograms.parse({
+  const shows = sdkSchemas.PublicShows.parse({
     contractVersion: 1,
     timezone: "Europe/Amsterdam",
     fromDate: "2026-10-12",
     throughDate: "2026-10-18",
     truncated: false,
-    programs: [
+    shows: [
       {
         id: "00000000-0000-4000-8000-000000000020",
         title: "Morning",
@@ -680,7 +685,7 @@ test("station profile, programme slots and traffic causes parse", () => {
       },
     ],
   });
-  expect(programs.programs[0]?.slots[0]?.startTime).toBe("10:00");
+  expect(shows.shows[0]?.slots[0]?.startTime).toBe("10:00");
 
   const incident = sdkSchemas.TrafficPublic.parse({
     contractVersion: 1,
@@ -816,6 +821,83 @@ test("GraphQL authentication denial does not fall back to REST", async () => {
   });
   await expect(client.getStation()).rejects.toMatchObject({ code: "UNAUTHENTICATED", status: 401 });
   expect(paths).toEqual(["/api/v1/stations/station-a/graphql"]);
+});
+
+test("a GraphQL field error keeps its code, whatever the response status", async () => {
+  for (const status of [200, 400]) {
+    const client = createStationClient({
+      baseUrl: "https://radio.example",
+      stationSlug: "station-a",
+      apiToken: "fixture-token",
+      transport: "graphql",
+      fetch: async (_url, init) => {
+        const body = JSON.parse(String(init?.body)) as { query: string };
+        if (body.query.includes("SdkStation"))
+          return Response.json({ data: { station: { ...stationBody, profile: null } } });
+        return Response.json(
+          {
+            data: { content: null },
+            errors: [
+              {
+                message: "Invalid arguments",
+                path: ["content"],
+                extensions: { code: "VALIDATION_ERROR" },
+              },
+            ],
+          },
+          { status },
+        );
+      },
+    });
+    await expect(client.getContent({ type: "news", limit: 99 })).rejects.toMatchObject({
+      name: "RadioToolsGraphqlError",
+      code: "VALIDATION_ERROR",
+      message: "Invalid arguments",
+    });
+  }
+});
+
+test("auto transport reads REST when the GraphQL route is missing, not when a field is", async () => {
+  const paths: string[] = [];
+  const client = createStationClient({
+    baseUrl: "https://radio.example",
+    stationSlug: "station-a",
+    apiToken: "fixture-token",
+    transport: "auto",
+    fetch: async (input, init) => {
+      const url = new URL(String(input));
+      if (!url.pathname.endsWith("/graphql")) {
+        paths.push(url.pathname);
+        return Response.json(stationBody);
+      }
+      const body = JSON.parse(String(init?.body)) as { query: string };
+      paths.push(body.query.includes("SdkStation") ? "graphql station" : "graphql nowPlaying");
+      if (body.query.includes("SdkStation")) {
+        return Response.json(
+          {
+            error: {
+              code: "NOT_FOUND",
+              message: "Not found",
+              requestId: "00000000-0000-4000-8000-000000000001",
+            },
+          },
+          { status: 404 },
+        );
+      }
+      return Response.json(
+        {
+          data: { nowPlaying: null },
+          errors: [{ message: "Not found", path: ["nowPlaying"], extensions: { code: "NOT_FOUND" } }],
+        },
+        { status: 404 },
+      );
+    },
+  });
+  await expect(client.getNowPlaying()).rejects.toMatchObject({
+    name: "RadioToolsGraphqlError",
+    code: "NOT_FOUND",
+  });
+  expect(paths).toEqual(["graphql station", "/api/v1/stations/station-a", "graphql nowPlaying"]);
 });
 
 test("429 responses retry and then succeed", async () => {

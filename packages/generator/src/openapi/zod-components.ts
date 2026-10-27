@@ -37,7 +37,6 @@ export const operationResponseSchemas: Record<
   getContentBySlug: { schema: "PublishedRecord", description: "One published record by slug" },
   getSchedule: { schema: "PublicSchedule", description: "Broadcast schedule" },
   getShows: { schema: "PublicShows", description: "Shows with their regular slots" },
-  getPrograms: { schema: "PublicPrograms", description: "Deprecated: the same shows as getShows" },
   getCurrentBroadcast: { schema: "PublicCurrentBroadcast", description: "Current broadcast" },
   getNowPlaying: { schema: "PublicNowPlaying", description: "Now playing" },
   getTrackHistory: { schema: "PublicTrackHistory", description: "Track history page" },
