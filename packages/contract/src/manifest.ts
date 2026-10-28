@@ -156,6 +156,14 @@ export const listenerSdkManifest: SdkManifest = {
       rest: { method: "GET", pathPattern: "{resources.broadcast}", resourceKey: "broadcast" },
     },
     {
+      name: "getOnDemand",
+      scope: "listener:read",
+      description:
+        "Paginated published recordings of aired broadcasts, newest first; null when the station offers none.",
+      graphqlField: "onDemand",
+      rest: { method: "GET", pathPattern: "{resources.onDemand}", resourceKey: "onDemand" },
+    },
+    {
       name: "getNowPlaying",
       scope: "listener:read",
       description: "Now playing track and freshness.",

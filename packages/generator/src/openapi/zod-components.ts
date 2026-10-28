@@ -40,6 +40,10 @@ export const operationResponseSchemas: Record<
   getCurrentBroadcast: { schema: "PublicCurrentBroadcast", description: "Current broadcast" },
   getNowPlaying: { schema: "PublicNowPlaying", description: "Now playing" },
   getTrackHistory: { schema: "PublicTrackHistory", description: "Track history page" },
+  getOnDemand: {
+    schema: "PublicOnDemand",
+    description: "Published recordings of aired broadcasts, newest first",
+  },
   getWeather: {
     schema: "WeatherPublic",
     nullable: true,

@@ -40,6 +40,10 @@ export async function fetchGetNowPlaying(client: StationClient) {
   return client.getNowPlaying();
 }
 
+export async function fetchGetOnDemand(client: StationClient) {
+  return client.getOnDemand();
+}
+
 export async function fetchGetWeather(client: StationClient) {
   return client.getWeather();
 }
@@ -61,31 +65,37 @@ export const cachedGetCurrentBroadcast = createCachedRadioToolsReader(
   (c) => c.getCurrentBroadcast(),
 );
 
-/** App Router helper for `/api/radiotools/-station` */
+/** App Router helper for `/api/radiotools/station` */
 export async function jsonResponseStation(client: StationClient) {
   const data = await client.getStation();
   return NextResponse.json(data);
 }
 
-/** App Router helper for `/api/radiotools/-current-broadcast` */
+/** App Router helper for `/api/radiotools/current-broadcast` */
 export async function jsonResponseCurrentBroadcast(client: StationClient) {
   const data = await client.getCurrentBroadcast();
   return NextResponse.json(data);
 }
 
-/** App Router helper for `/api/radiotools/-now-playing` */
+/** App Router helper for `/api/radiotools/now-playing` */
 export async function jsonResponseNowPlaying(client: StationClient) {
   const data = await client.getNowPlaying();
   return NextResponse.json(data);
 }
 
-/** App Router helper for `/api/radiotools/-weather` */
+/** App Router helper for `/api/radiotools/on-demand` */
+export async function jsonResponseOnDemand(client: StationClient) {
+  const data = await client.getOnDemand();
+  return NextResponse.json(data);
+}
+
+/** App Router helper for `/api/radiotools/weather` */
 export async function jsonResponseWeather(client: StationClient) {
   const data = await client.getWeather();
   return NextResponse.json(data);
 }
 
-/** App Router helper for `/api/radiotools/-traffic` */
+/** App Router helper for `/api/radiotools/traffic` */
 export async function jsonResponseTraffic(client: StationClient) {
   const data = await client.getTraffic();
   return NextResponse.json(data);

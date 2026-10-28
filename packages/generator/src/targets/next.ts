@@ -12,7 +12,7 @@ function renderNextServerHelpers(): string {
   const routeHandlers = ZERO_ARG_READ_METHODS.map((method) => {
     const suffix = method.replace(/^get/, "");
     const exportName = `jsonResponse${suffix}`;
-    const routeName = suffix.replace(/([A-Z])/g, "-$1").toLowerCase();
+    const routeName = suffix.replace(/([A-Z])/g, "-$1").toLowerCase().replace(/^-/, "");
     return `/** App Router helper for \`/api/radiotools/${routeName}\` */
 export async function ${exportName}(client: StationClient) {
   const data = await client.${method}();

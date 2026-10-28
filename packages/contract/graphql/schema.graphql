@@ -30,6 +30,10 @@ scalar JSON
     """
     shows(fromDate: String!, throughDate: String!): Shows
     currentBroadcast: CurrentBroadcast
+    """
+    Published recordings of aired broadcasts, newest first; programId keeps one show's.
+    """
+    onDemand(programId: ID, cursor: String, limit: Int = 25): OnDemand
     nowPlaying: NowPlaying
     trackHistory(cursor: String, limit: Int = 25): TrackHistory
     weather: Weather
@@ -92,6 +96,10 @@ scalar JSON
     broadcast: String
     nowPlaying: String
     trackHistory: String
+    """
+    Published recordings of aired broadcasts; null with the schedule or the media module off.
+    """
+    onDemand: String
     """
     The WebSocket carrying the station's public feed rows; null while offline or switched off.
     """
@@ -273,6 +281,8 @@ scalar JSON
     id: ID!
     title: String!
     profileId: ID
+    "live, nonstop or prerecorded"
+    type: String!
     presenters: [BroadcastPresenter!]!
     slots: [ShowSlot!]!
   }
@@ -357,7 +367,7 @@ scalar JSON
     status: String!
     cancellationReason: String!
     repeatOfId: ID
-    "live, prerecorded or repeat"
+    "live, nonstop, prerecorded or repeat"
     nature: String!
     program: BroadcastProgram!
     presenters: [BroadcastPresenter!]!
@@ -367,6 +377,39 @@ scalar JSON
     id: ID!
     title: String!
     profileId: ID
+  }
+
+  type OnDemand {
+    contractVersion: Int!
+    timezone: String!
+    items: [OnDemandBroadcast!]!
+    nextCursor: String
+  }
+
+  """
+  A published recording: the broadcast as the schedule showed it, and its audio.
+  """
+  type OnDemandBroadcast {
+    id: ID!
+    title: String!
+    description: String!
+    startsAt: String!
+    endsAt: String!
+    timezone: String!
+    localDate: String!
+    "live, nonstop, prerecorded or repeat"
+    nature: String!
+    program: BroadcastProgram!
+    presenters: [BroadcastPresenter!]!
+    audio: OnDemandAudio!
+  }
+
+  type OnDemandAudio {
+    "Anonymous, byte-range capable, same origin as resources.media."
+    url: String!
+    mime: String!
+    size: Int!
+    durationSeconds: Float
   }
 
   type BroadcastPresenter {

@@ -30,4 +30,4 @@ const { data, error, loading, refresh } = useGetNowPlaying(client);
 
 ## Composables
 
-`useGetStation`, `useGetCurrentBroadcast`, `useGetNowPlaying`, `useGetWeather`, `useGetTraffic`, `useRecommendedPollInterval`. Each returns refs `{ data, error, loading }` and a `refresh()` function.
+`useGetStation`, `useGetCurrentBroadcast`, `useGetNowPlaying`, `useGetOnDemand`, `useGetWeather`, `useGetTraffic`, `useRecommendedPollInterval`. Each returns refs `{ data, error, loading }` and a `refresh()` function.

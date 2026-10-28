@@ -75,6 +75,17 @@ const READS: Record<string, (doc: string) => string> = {
         """${doc}"""
         params: dict[str, Any] = {"limit": limit, "cursor": cursor}
         return self._get_json(self._resource("trackHistory"), params={k: v for k, v in params.items() if v is not None})`,
+  getOnDemand: (doc) => `    def get_on_demand(self, *, program_id: str | None = None, cursor: str | None = None, limit: int = 25) -> dict[str, Any] | None:
+        """${doc}
+
+        Each item is the broadcast as the schedule shows it, plus description and audio
+        (an anonymous, byte-range capable URL). program_id keeps one show's recordings.
+        """
+        href = self.get_station().get("resources", {}).get("onDemand")
+        if not href:
+            return None
+        params: dict[str, Any] = {"limit": limit, "cursor": cursor, "programId": program_id}
+        return self._get_json(href, params={k: v for k, v in params.items() if v is not None})`,
   getWeather: (doc) => `    def get_weather(self) -> dict[str, Any] | None:
         """${doc}"""
         href = self.get_station().get("resources", {}).get("weather")
