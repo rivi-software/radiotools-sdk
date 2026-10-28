@@ -73,6 +73,10 @@ export function useGetNowPlaying(client: StationClient) {
   return useStationQuery(client, "getNowPlaying", () => client.getNowPlaying());
 }
 
+export function useGetOnDemand(client: StationClient) {
+  return useStationQuery(client, "getOnDemand", () => client.getOnDemand());
+}
+
 export function useGetWeather(client: StationClient) {
   return useStationQuery(client, "getWeather", () => client.getWeather());
 }

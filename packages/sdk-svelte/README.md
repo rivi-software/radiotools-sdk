@@ -32,4 +32,4 @@ Requires Svelte 4 or newer.
 
 ## Stores
 
-`createGetStationStore`, `createGetCurrentBroadcastStore`, `createGetNowPlayingStore`, `createGetWeatherStore`, `createGetTrafficStore`, `createRecommendedPollIntervalStore`. Each store holds `{ data, error, loading }` and has a `refresh()` method. `stationStoreLoading(store)` derives a loading-only store.
+`createGetStationStore`, `createGetCurrentBroadcastStore`, `createGetNowPlayingStore`, `createGetOnDemandStore`, `createGetWeatherStore`, `createGetTrafficStore`, `createRecommendedPollIntervalStore`. Each store holds `{ data, error, loading }` and has a `refresh()` method. `stationStoreLoading(store)` derives a loading-only store.

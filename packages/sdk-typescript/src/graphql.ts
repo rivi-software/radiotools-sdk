@@ -131,6 +131,7 @@ export const stationQuery = /* GraphQL */ `
         broadcast
         nowPlaying
         trackHistory
+        onDemand
         realtime { url channel }
         weather
         traffic
@@ -241,6 +242,7 @@ const showFields = /* GraphQL */ `
   id
   title
   profileId
+  type
   presenters { id title }
   slots {
     weekday
@@ -274,6 +276,29 @@ export const currentBroadcastQuery = /* GraphQL */ `
       timezone
       asOf
       broadcast { ${broadcastFields} }
+    }
+  }
+`;
+
+export const onDemandQuery = /* GraphQL */ `
+  query SdkOnDemand($programId: ID, $cursor: String, $limit: Int) {
+    onDemand(programId: $programId, cursor: $cursor, limit: $limit) {
+      contractVersion
+      timezone
+      nextCursor
+      items {
+        id
+        title
+        description
+        startsAt
+        endsAt
+        timezone
+        localDate
+        nature
+        program { id title profileId }
+        presenters { id title }
+        audio { url mime size durationSeconds }
+      }
     }
   }
 `;
@@ -359,6 +384,10 @@ export function parseGraphqlNowPlaying(data: { nowPlaying: unknown }) {
 
 export function parseGraphqlTrackHistory(data: { trackHistory: unknown }) {
   return sdkSchemas.PublicTrackHistory.parse(data.trackHistory);
+}
+
+export function parseGraphqlOnDemand(data: { onDemand: unknown }) {
+  return sdkSchemas.PublicOnDemand.parse(data.onDemand);
 }
 
 export function parseGraphqlWeather(data: { weather: unknown }) {

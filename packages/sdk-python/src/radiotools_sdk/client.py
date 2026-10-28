@@ -150,6 +150,18 @@ class RadioToolsStationClient:
         """Current on-air broadcast state."""
         return self._get_json(self._resource("broadcast"))
 
+    def get_on_demand(self, *, program_id: str | None = None, cursor: str | None = None, limit: int = 25) -> dict[str, Any] | None:
+        """Paginated published recordings of aired broadcasts, newest first; null when the station offers none.
+
+        Each item is the broadcast as the schedule shows it, plus description and audio
+        (an anonymous, byte-range capable URL). program_id keeps one show's recordings.
+        """
+        href = self.get_station().get("resources", {}).get("onDemand")
+        if not href:
+            return None
+        params: dict[str, Any] = {"limit": limit, "cursor": cursor, "programId": program_id}
+        return self._get_json(href, params={k: v for k, v in params.items() if v is not None})
+
     def get_now_playing(self) -> dict[str, Any]:
         """Now playing track and freshness."""
         return self._get_json(self._resource("nowPlaying"))

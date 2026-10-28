@@ -21,6 +21,7 @@ for story in client.get_content("news", limit=5)["records"]:
 
 page = client.get_content_by_slug("pages", "about-us")
 shows = client.get_shows("2026-10-21", "2026-10-27")
+recordings = client.get_on_demand(limit=10)  # None when the station offers no on-demand recordings
 ```
 
 For GraphQL, WebSocket, ETag, and retry behavior, use `@rivi-software/radiotools-sdk` (TypeScript).

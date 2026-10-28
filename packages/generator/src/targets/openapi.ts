@@ -127,6 +127,14 @@ function renderOpenApi(): string {
         { name: "cursor", schema: { type: "string" } },
         { name: "limit", schema: { type: "integer", minimum: 1, maximum: 50, default: 25 } },
       ],
+      getOnDemand: [
+        {
+          name: "programId",
+          schema: { type: "string", format: "uuid", description: "Keep one show's recordings" },
+        },
+        { name: "cursor", schema: { type: "string", maxLength: 200 } },
+        { name: "limit", schema: { type: "integer", minimum: 1, maximum: 50, default: 25 } },
+      ],
     };
 
   // Resource hrefs the server publishes under /api/v1/stations/{stationSlug}.
@@ -134,6 +142,7 @@ function renderOpenApi(): string {
     broadcast: "broadcast/current",
     nowPlaying: "now-playing",
     trackHistory: "track-history",
+    onDemand: "on-demand",
   };
   // Record reads are emitted with getContent below.
   const contentRecordReads = new Set(["getContentRecord", "getContentBySlug"]);

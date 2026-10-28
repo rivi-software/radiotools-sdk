@@ -30,6 +30,6 @@ Create the client once, outside components or in a memo, so the hooks keep a sta
 
 ## Hooks
 
-`useGetStation`, `useGetCurrentBroadcast`, `useGetNowPlaying`, `useGetWeather`, `useGetTraffic`, `useRecommendedPollInterval`. Each returns `{ data, error, loading, refresh }`.
+`useGetStation`, `useGetCurrentBroadcast`, `useGetNowPlaying`, `useGetOnDemand`, `useGetWeather`, `useGetTraffic`, `useRecommendedPollInterval`. Each returns `{ data, error, loading, refresh }`.
 
 For anything else, call the client directly.

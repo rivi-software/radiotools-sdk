@@ -622,6 +622,7 @@ test("GraphQL reads shows and the station's shows link", async () => {
   await client.getShows({ fromDate: "2026-10-21", throughDate: "2026-10-27" });
   expect(queries[0]).toMatch(/\bshows\b/);
   expect(queries[1]).toMatch(/shows\(fromDate/);
+  expect(queries[1]).toMatch(/\btype\b/);
 });
 
 test("the Python types name the same fields as the typed records", async () => {
@@ -975,4 +976,214 @@ test("environment options accept either customer credential", () => {
     ingestToken: "rtm_ingest",
   });
   expect(() => stationClientOptionsFromEnv({})).toThrow(/RADIOTOOLS_BASE_URL/);
+});
+
+const onDemandItem = {
+  id: "00000000-0000-4000-8000-000000000030",
+  title: "Morning",
+  description: "Monday's edition",
+  startsAt: "2026-10-26T06:00:00.000Z",
+  endsAt: "2026-10-26T08:00:00.000Z",
+  timezone: "Europe/Amsterdam",
+  localDate: "2026-10-26",
+  nature: "live",
+  program: { id: "00000000-0000-4000-8000-000000000022", title: "Morning", profileId: null },
+  presenters: [{ id: "00000000-0000-4000-8000-000000000021", title: "Anna" }],
+  audio: {
+    url: "/api/media/public/station-a/00000000-0000-4000-8000-000000000031",
+    mime: "audio/mpeg",
+    size: 123_456,
+    durationSeconds: 7200,
+  },
+};
+const onDemandStation = {
+  ...stationBody,
+  resources: { ...stationBody.resources, onDemand: "/api/v1/stations/station-a/on-demand" },
+};
+
+test("getOnDemand reads the on-demand resource and iterateOnDemand follows its cursors", async () => {
+  const requested: string[] = [];
+  const client = createStationClient({
+    baseUrl: "https://radio.example",
+    stationSlug: "station-a",
+    apiToken: "fixture-api-token",
+    fetch: async (input) => {
+      const url = new URL(String(input));
+      requested.push(`${url.pathname}${url.search}`);
+      if (url.pathname.endsWith("/stations/station-a")) return Response.json(onDemandStation);
+      const second = url.searchParams.get("cursor") === "page-2";
+      return Response.json({
+        contractVersion: 1,
+        timezone: "Europe/Amsterdam",
+        items: [second ? { ...onDemandItem, id: "00000000-0000-4000-8000-000000000032" } : onDemandItem],
+        nextCursor: second ? null : "page-2",
+      });
+    },
+  });
+  const programId = onDemandItem.program.id;
+  const page = await client.getOnDemand({ programId, limit: 1 });
+  expect(page?.items[0]?.audio.durationSeconds).toBe(7200);
+  expect(page?.nextCursor).toBe("page-2");
+  expect(requested[1]).toBe(
+    `/api/v1/stations/station-a/on-demand?limit=1&programId=${programId}`,
+  );
+
+  const ids: string[] = [];
+  for await (const item of client.iterateOnDemand({ programId, limit: 1 })) ids.push(item.id);
+  expect(ids).toEqual([onDemandItem.id, "00000000-0000-4000-8000-000000000032"]);
+  expect(requested.slice(2)).toEqual([
+    `/api/v1/stations/station-a/on-demand?limit=1&programId=${programId}`,
+    `/api/v1/stations/station-a/on-demand?limit=1&programId=${programId}&cursor=page-2`,
+  ]);
+});
+
+test("a station without on-demand answers null without a second request", async () => {
+  const urls: string[] = [];
+  const client = createStationClient({
+    baseUrl: "https://radio.example",
+    stationSlug: "station-a",
+    apiToken: "fixture-api-token",
+    // A station document from before on-demand has no onDemand link at all.
+    fetch: async (input) => {
+      urls.push(String(input));
+      return Response.json(stationBody);
+    },
+  });
+  expect((await client.getStation()).resources.onDemand).toBeNull();
+  expect(await client.getOnDemand()).toBeNull();
+  const items: unknown[] = [];
+  for await (const item of client.iterateOnDemand()) items.push(item);
+  expect(items).toEqual([]);
+  expect(urls).toEqual(["https://radio.example/api/v1/stations/station-a"]);
+});
+
+test("GraphQL reads on-demand and the station's on-demand link", async () => {
+  const requests: { query: string; variables?: Record<string, unknown> }[] = [];
+  const client = createStationClient({
+    baseUrl: "https://radio.example",
+    stationSlug: "station-a",
+    apiToken: "fixture-api-token",
+    transport: "graphql",
+    fetch: async (_url, init) => {
+      const body = JSON.parse(String(init?.body)) as (typeof requests)[number];
+      requests.push(body);
+      if (requests.length === 1)
+        return Response.json({ data: { station: { ...onDemandStation, profile: null } } });
+      return Response.json({
+        data: {
+          onDemand: {
+            contractVersion: 1,
+            timezone: "Europe/Amsterdam",
+            items: [{ ...onDemandItem, nature: "repeat" }],
+            nextCursor: null,
+          },
+        },
+      });
+    },
+  });
+  const page = await client.getOnDemand({ cursor: "page-2" });
+  expect(page?.items[0]?.nature).toBe("repeat");
+  expect(requests[0]?.query).toMatch(/\bonDemand\b/);
+  expect(requests[1]?.query).toMatch(/onDemand\(programId/);
+  expect(requests[1]?.variables).toEqual({ programId: undefined, cursor: "page-2", limit: 25 });
+});
+
+test("nonstop broadcasts and show types parse; a show without a type is live", () => {
+  const broadcast = {
+    id: "00000000-0000-4000-8000-000000000040",
+    title: "Night",
+    startsAt: "2026-10-26T22:00:00.000Z",
+    endsAt: "2026-10-27T05:00:00.000Z",
+    timezone: "Europe/Amsterdam",
+    localDate: "2026-10-27",
+    resolution: "regular",
+    status: "scheduled",
+    cancellationReason: "",
+    repeatOfId: null,
+    nature: "nonstop",
+    program: { id: "00000000-0000-4000-8000-000000000041", title: "Night", profileId: null },
+    presenters: [],
+  };
+  const schedule = sdkSchemas.PublicSchedule.parse({
+    contractVersion: 1,
+    timezone: "Europe/Amsterdam",
+    broadcasts: [broadcast],
+    truncated: false,
+  });
+  expect(schedule.broadcasts[0]?.nature).toBe("nonstop");
+  expect(() => sdkSchemas.PublicSchedule.parse({ ...schedule, broadcasts: [{ ...broadcast, nature: "podcast" }] })).toThrow();
+
+  const show = { id: broadcast.program.id, title: "Night", profileId: null, presenters: [], slots: [] };
+  const shows = sdkSchemas.PublicShows.parse({
+    contractVersion: 1,
+    timezone: "Europe/Amsterdam",
+    fromDate: "2026-10-26",
+    throughDate: "2026-11-01",
+    shows: [{ ...show, type: "nonstop" }, show],
+    truncated: false,
+  });
+  expect(shows.shows.map((entry) => entry.type)).toEqual(["nonstop", "live"]);
+});
+
+test("weather and traffic snapshots parse whatever source reported them", () => {
+  const weatherSnapshot = (source: string) => ({
+    source,
+    coverage: {
+      id: "nl:midden",
+      name: "Midden-Nederland",
+      countryCode: "nl",
+      countryName: "Netherlands",
+      latitude: 52.09,
+      longitude: 5.12,
+      timezone: "Europe/Amsterdam",
+    },
+    freshness: {
+      status: "fresh",
+      thresholdSeconds: 1800,
+      ageSeconds: 60,
+      fetchedAt: "2026-10-28T10:00:00.000Z",
+      observedAt: "2026-10-28T10:00:00.000Z",
+      lastError: null,
+    },
+    current: null,
+    hourly: [],
+    daily: [],
+  });
+  const weather = sdkSchemas.WeatherPublic.parse({
+    contractVersion: 1,
+    stationId: "station-a",
+    timezone: "Europe/Amsterdam",
+    snapshots: [weatherSnapshot("open-meteo"), weatherSnapshot("openweathermap"), weatherSnapshot("station")],
+  });
+  expect(weather.snapshots.map((snapshot) => snapshot.source)).toEqual([
+    "open-meteo",
+    "openweathermap",
+    "station",
+  ]);
+
+  const trafficSnapshot = (source: string) => ({
+    source,
+    watch: { roads: [] },
+    freshness: {
+      status: "fresh",
+      thresholdSeconds: 300,
+      ageSeconds: 0,
+      fetchedAt: null,
+      observedAt: null,
+      lastError: null,
+    },
+    incidents: [],
+    totals: { incidentCount: 0, jamDistanceMeters: 0, delaySeconds: 0 },
+  });
+  for (const source of ["anwb", "ndw", "station"]) {
+    const traffic = sdkSchemas.TrafficPublic.parse({
+      contractVersion: 1,
+      stationId: "station-a",
+      snapshot: trafficSnapshot(source),
+    });
+    expect(traffic.snapshot.source).toBe(source);
+  }
+  expect(() =>
+    sdkSchemas.TrafficPublic.parse({ contractVersion: 1, stationId: "station-a", snapshot: trafficSnapshot("") }),
+  ).toThrow();
 });

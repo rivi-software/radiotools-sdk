@@ -1,6 +1,6 @@
 # @rivi-software/radiotools-sdk
 
-TypeScript client for the RadioTools listener API: published station content, schedule, now playing, weather and traffic, realtime updates, and playback ingest. Includes ETag caching and retries.
+TypeScript client for the RadioTools listener API: published station content, schedule, shows, on-demand recordings, now playing, weather and traffic, realtime updates, and playback ingest. Includes ETag caching and retries.
 
 ## Install
 
@@ -41,9 +41,30 @@ const schedule = await client.getSchedule({ fromDate: "2026-10-06", throughDate:
 
 ### Client methods
 
-`getStation`, `getSchemas`, `getContent`, `getContentRecord`, `getContentBySlug`, `iterateContent`, `getSchedule`, `getShows`, `getCurrentBroadcast`, `getNowPlaying`, `getTrackHistory`, `iterateTrackHistory`, `getWeather`, `getTraffic`, `recommendedPollIntervalMs`, `previewEditorial`, `reportPlayback`, `subscribe`.
+`getStation`, `getSchemas`, `getContent`, `getContentRecord`, `getContentBySlug`, `iterateContent`, `getSchedule`, `getShows`, `getCurrentBroadcast`, `getNowPlaying`, `getTrackHistory`, `iterateTrackHistory`, `getOnDemand`, `iterateOnDemand`, `getWeather`, `getTraffic`, `recommendedPollIntervalMs`, `previewEditorial`, `reportPlayback`, `subscribe`.
 
-Schedule windows are `YYYY-MM-DD` dates covering 1 to 42 inclusive days. Programmes include their presenters and regular `slots` (weekday, start time, duration); broadcasts carry a `nature` of `live`, `prerecorded` or `repeat`. `station.profile` holds the tagline, frequency label, links and contact details once the station has saved them.
+Schedule windows are `YYYY-MM-DD` dates covering 1 to 42 inclusive days. Shows include their presenters and regular `slots` (weekday, start time, duration) and have a `type` of `live`, `nonstop` (automation playing music) or `prerecorded`; broadcasts carry a `nature` of `live`, `nonstop`, `prerecorded` or `repeat`. `station.profile` holds the tagline, frequency label, links and contact details once the station has saved them.
+
+### On-demand recordings
+
+```ts
+// Published recordings of aired broadcasts, newest first; null when the station offers none.
+const recordings = await client.getOnDemand({ limit: 10 });
+for (const item of recordings?.items ?? []) {
+  console.log(item.title, item.startsAt, new URL(item.audio.url, baseUrl).href);
+}
+
+// One show's recordings: pass the program id from the schedule or the shows.
+for await (const item of client.iterateOnDemand({ programId })) {
+  console.log(item.localDate, item.description, item.audio.durationSeconds);
+}
+```
+
+Each item is the broadcast as `getSchedule` shows it (`id`, `title`, `startsAt`, `endsAt`, `nature`, `program`, `presenters`) plus `description` and `audio`: an anonymous, byte-range capable URL on the same origin as `station.resources.media`, with `mime`, `size` and `durationSeconds`. `station.resources.onDemand` is `null` while the station has its schedule or media library switched off.
+
+### Weather and traffic
+
+`getWeather()` and `getTraffic()` return `null` when the station does not publish them. Each weather snapshot and the traffic snapshot name their `source`: `open-meteo`, `openweathermap` or `station` for weather, `anwb`, `ndw` or `station` for traffic, where `station` is the station's own feed. The SDK accepts any source, so a station can switch providers without an SDK update. OpenWeatherMap asks for a visible credit, "Weather data provided by OpenWeather".
 
 ### Content
 

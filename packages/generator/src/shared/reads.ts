@@ -3,6 +3,7 @@ export const ZERO_ARG_READ_METHODS = [
   "getStation",
   "getCurrentBroadcast",
   "getNowPlaying",
+  "getOnDemand",
   "getWeather",
   "getTraffic",
 ] as const;

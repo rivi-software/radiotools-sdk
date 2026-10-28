@@ -6,9 +6,11 @@ import {
   graphqlRequest,
   isGraphqlUnavailable,
   nowPlayingQuery,
+  onDemandQuery,
   parseGraphqlContent,
   parseGraphqlCurrentBroadcast,
   parseGraphqlNowPlaying,
+  parseGraphqlOnDemand,
   parseGraphqlRecord,
   parseGraphqlSchedule,
   parseGraphqlSchemas,
@@ -43,6 +45,7 @@ import type {
   SdkPreviewInput,
   SdkPublicCurrentBroadcast,
   SdkPublicNowPlaying,
+  SdkPublicOnDemand,
   SdkPublicSchedule,
   SdkPublicSchemaList,
   SdkPublicShows,
@@ -142,6 +145,14 @@ export type TrackHistoryOptions = {
   limit?: number;
 };
 
+export type OnDemandOptions = {
+  /** Keep one show's recordings: the `program.id` of its broadcasts. */
+  programId?: string;
+  cursor?: string;
+  /** 1 to 50; defaults to 25. */
+  limit?: number;
+};
+
 export type ReportPlaybackTarget = {
   stationId?: string;
 };
@@ -172,6 +183,15 @@ export type StationClient = {
   iterateTrackHistory: (
     options?: Omit<TrackHistoryOptions, "cursor">,
   ) => AsyncGenerator<SdkPublicTrackHistory["items"][number]>;
+  /**
+   * One page of the published recordings of aired broadcasts, newest first, each with an anonymous
+   * byte-range audio URL; `null` when the station offers none (schedule or media switched off).
+   */
+  getOnDemand: (options?: OnDemandOptions) => Promise<SdkPublicOnDemand | null>;
+  /** Every published recording, newest first; yields nothing when the station offers none. */
+  iterateOnDemand: (
+    options?: Omit<OnDemandOptions, "cursor">,
+  ) => AsyncGenerator<SdkPublicOnDemand["items"][number]>;
   getWeather: () => Promise<SdkWeatherPublic | null>;
   getTraffic: () => Promise<SdkTrafficPublic | null>;
   /** Milliseconds from `station.delivery.pollIntervalSeconds`. */
@@ -294,7 +314,7 @@ export function createStationClient(options: CreateStationClientOptions): Statio
     return { station, href: requirePublicHref(station.resources[resource], name) };
   };
 
-  const optionalStationResource = async (resource: "weather" | "traffic") => {
+  const optionalStationResource = async (resource: "weather" | "traffic" | "onDemand") => {
     const station = stationCache ?? (await getStation());
     return station.resources[resource] ? station : null;
   };
@@ -561,6 +581,50 @@ export function createStationClient(options: CreateStationClientOptions): Statio
     } while (cursor);
   }
 
+  const getOnDemand = async (list: OnDemandOptions = {}): Promise<SdkPublicOnDemand | null> => {
+    const station = await optionalStationResource("onDemand");
+    if (!station?.resources.onDemand) return null;
+    const onDemandHref = station.resources.onDemand;
+    const limit = list.limit ?? 25;
+    return preferGraphql(
+      async () => {
+        const data = await graphqlRequest<{ onDemand: unknown }>(
+          graphqlEndpoint,
+          onDemandQuery,
+          { programId: list.programId, cursor: list.cursor, limit },
+          httpOptions,
+        );
+        return parseGraphqlOnDemand(data);
+      },
+      async () => {
+        const params = new URLSearchParams({ limit: String(limit) });
+        if (list.programId) params.set("programId", list.programId);
+        if (list.cursor) params.set("cursor", list.cursor);
+        const { data } = await readPublicJson(
+          absoluteUrl(options.baseUrl, `${onDemandHref}?${params}`),
+          sdkSchemas.PublicOnDemand,
+          httpOptions,
+        );
+        return data;
+      },
+    );
+  };
+
+  async function* iterateOnDemand(
+    list: Omit<OnDemandOptions, "cursor"> = {},
+  ): AsyncGenerator<SdkPublicOnDemand["items"][number]> {
+    const seen = new Set<string>();
+    let cursor: string | undefined;
+    do {
+      const page = await getOnDemand({ ...list, cursor });
+      if (!page) return;
+      for (const item of page.items) yield item;
+      if (!page.nextCursor || seen.has(page.nextCursor)) return;
+      seen.add(page.nextCursor);
+      cursor = page.nextCursor;
+    } while (cursor);
+  }
+
   const getWeather = async (): Promise<SdkWeatherPublic | null> => {
     const station = await optionalStationResource("weather");
     if (!station?.resources.weather) return null;
@@ -624,6 +688,8 @@ export function createStationClient(options: CreateStationClientOptions): Statio
     getNowPlaying,
     getTrackHistory,
     iterateTrackHistory,
+    getOnDemand,
+    iterateOnDemand,
     getWeather,
     getTraffic,
     recommendedPollIntervalMs: async () =>

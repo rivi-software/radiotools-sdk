@@ -57,6 +57,10 @@ export function createGetNowPlayingStore(client: StationClient) {
   return createStationStore(() => client.getNowPlaying());
 }
 
+export function createGetOnDemandStore(client: StationClient) {
+  return createStationStore(() => client.getOnDemand());
+}
+
 export function createGetWeatherStore(client: StationClient) {
   return createStationStore(() => client.getWeather());
 }

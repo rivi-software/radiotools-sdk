@@ -131,6 +131,11 @@ export const PublicStation = z.object({
     broadcast: href.nullable(),
     nowPlaying: href.nullable(),
     trackHistory: href.nullable(),
+    /**
+     * Published recordings of aired broadcasts; null while the station has its schedule or its
+     * media library switched off. A station document from before on-demand reads as null.
+     */
+    onDemand: href.nullable().default(null),
     /** The public feed WebSocket; null while the station is offline or realtime is switched off. */
     realtime: PublicRealtimeDescriptor.nullable(),
     weather: href.nullable(),
@@ -561,8 +566,13 @@ export const RevisionPreview = z.object({
 });
 
 const LocalDate = z.iso.date();
-/** How a broadcast reaches air: `live`, a `prerecorded` recording, or a `repeat` of `repeatOfId`. */
-export const BroadcastNature = z.enum(["live", "prerecorded", "repeat"]);
+/**
+ * How a broadcast reaches air: `live` is presented by its team, `nonstop` is automation playing
+ * music, `prerecorded` a finished recording, and `repeat` replays the broadcast `repeatOfId` names.
+ */
+export const BroadcastNature = z.enum(["live", "nonstop", "prerecorded", "repeat"]);
+/** What kind of show it is; its broadcasts take the type as their `nature` unless set apart. */
+export const ShowType = z.enum(["live", "nonstop", "prerecorded"]);
 export const PublicBroadcast = z.object({
   id: z.uuid(),
   title: z.string(),
@@ -574,7 +584,7 @@ export const PublicBroadcast = z.object({
   status: z.enum(["scheduled", "cancelled", "live", "completed"]),
   cancellationReason: z.string(),
   repeatOfId: z.uuid().nullable(),
-  /** `prerecorded` or `repeat` lets a listener app label the slot; `live` otherwise. */
+  /** `nonstop`, `prerecorded` or `repeat` lets a listener app label the slot; `live` otherwise. */
   nature: BroadcastNature.default("live"),
   program: z.object({ id: z.uuid(), title: z.string(), profileId: z.uuid().nullable() }),
   presenters: z.array(z.object({ id: z.uuid(), title: z.string() })),
@@ -604,6 +614,8 @@ export const PublicProgram = z.object({
   id: z.uuid(),
   title: z.string(),
   profileId: z.uuid().nullable(),
+  /** `nonstop` or `prerecorded` lets a listener app label the show; `live` otherwise. */
+  type: ShowType.default("live"),
   /** Published presenter profiles of the programme and of its slots in the window. */
   presenters: z.array(PublicPresenter),
   /** Regular slots whose rule overlaps the requested window, Monday first. */
@@ -623,6 +635,37 @@ export const PublicCurrentBroadcast = z.object({
   timezone: Timezone,
   asOf: z.iso.datetime(),
   broadcast: PublicBroadcast.nullable(),
+});
+
+/** A published recording: the broadcast as the public schedule showed it, and its audio. */
+export const PublicOnDemandBroadcast = z.object({
+  id: z.uuid(),
+  title: z.string(),
+  /** What the recording is about, set by whoever attached it; empty when nobody did. */
+  description: z.string(),
+  startsAt: z.iso.datetime(),
+  endsAt: z.iso.datetime(),
+  timezone: Timezone,
+  localDate: LocalDate,
+  nature: BroadcastNature,
+  program: z.object({ id: z.uuid(), title: z.string(), profileId: z.uuid().nullable() }),
+  presenters: z.array(PublicPresenter),
+  audio: z.object({
+    /** Anonymous and byte-range capable, on the same origin as `resources.media`. */
+    url: z.string(),
+    mime: z.string(),
+    /** Bytes. */
+    size: z.number().int().nonnegative(),
+    durationSeconds: z.number().nonnegative().nullable(),
+  }),
+});
+/** One page of a station's published recordings, newest broadcast first. */
+export const PublicOnDemand = z.object({
+  contractVersion: ListenerContractVersion,
+  timezone: Timezone,
+  items: z.array(PublicOnDemandBroadcast).max(50),
+  /** Opaque cursor; pass it back as `cursor` for the next page. */
+  nextCursor: z.string().nullable(),
 });
 
 export const PlaybackArtworkUrl = z
@@ -835,9 +878,15 @@ const WeatherFreshness = z
     lastError: z.string().nullable(),
   })
   .strict();
+/**
+ * Who forecast a snapshot: `open-meteo` (RadioTools' data or the station's own key),
+ * `openweathermap` (the station's key) or `station` (the station's own feed). Any other source a
+ * later RadioTools release adds parses too. OpenWeatherMap asks for a visible credit.
+ */
+const WeatherSource = z.string().min(1);
 const WeatherSnapshot = z
   .object({
-    source: z.literal("open-meteo"),
+    source: WeatherSource,
     coverage: WeatherCoverageArea,
     freshness: WeatherFreshness,
     current: WeatherCurrent.nullable(),
@@ -901,9 +950,15 @@ const TrafficIncident = z
     updatedAt: z.string().datetime(),
   })
   .strict();
+/**
+ * Who reported the incidents: `anwb` (RadioTools' data), `ndw` (the Netherlands' national road
+ * data) or `station` (the station's own feed). Any other source a later RadioTools release adds
+ * parses too.
+ */
+const TrafficSource = z.string().min(1);
 const TrafficSnapshot = z
   .object({
-    source: z.literal("anwb"),
+    source: TrafficSource,
     watch: z.object({ roads: z.array(TrafficWatchRoad) }).strict(),
     freshness: z
       .object({
@@ -990,6 +1045,7 @@ export const sdkSchemas = {
   PublicSchedule,
   PublicShows,
   PublicCurrentBroadcast,
+  PublicOnDemand,
   WeatherPublic,
   TrafficPublic,
   PreviewInput,
@@ -1025,6 +1081,10 @@ export type SdkPublicSchedule = z.infer<typeof PublicSchedule>;
 export type SdkPublicShows = z.infer<typeof PublicShows>;
 export type SdkPublicProgramSlot = z.infer<typeof PublicProgramSlot>;
 export type SdkPublicCurrentBroadcast = z.infer<typeof PublicCurrentBroadcast>;
+export type SdkBroadcastNature = z.infer<typeof BroadcastNature>;
+export type SdkShowType = z.infer<typeof ShowType>;
+export type SdkPublicOnDemand = z.infer<typeof PublicOnDemand>;
+export type SdkPublicOnDemandBroadcast = z.infer<typeof PublicOnDemandBroadcast>;
 export type SdkWeatherPublic = z.infer<typeof WeatherPublic>;
 export type SdkTrafficPublic = z.infer<typeof TrafficPublic>;
 export type SdkPreviewInput = z.infer<typeof PreviewInput>;
