@@ -17,7 +17,7 @@ Requires Vue 3.4 or newer.
 import { createStationClient } from "@rivi-software/radiotools-sdk";
 import { useGetNowPlaying } from "@rivi-software/radiotools-sdk-vue";
 
-const client = createStationClient({ baseUrl, stationSlug, apiToken });
+const client = createStationClient({ baseUrl, stationSlug });
 const { data, error, loading, refresh } = useGetNowPlaying(client);
 </script>
 
@@ -27,6 +27,8 @@ const { data, error, loading, refresh } = useGetNowPlaying(client);
   <p v-else>{{ data?.track?.title }}</p>
 </template>
 ```
+
+Without `apiToken` the client reads anonymously, which works for a station that allows anonymous reads (**Settings › Listener APIs**). For a station that requires a token, keep it on your server and read through it there; never bundle the token in browser code.
 
 ## Composables
 

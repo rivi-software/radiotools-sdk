@@ -6,15 +6,13 @@ namespace RadioTools\Sdk;
 
 final class StationClient
 {
+    /** Leave $apiToken null for a station that allows anonymous reads. */
     public function __construct(
         private readonly string $baseUrl,
         private readonly string $stationSlug,
         private readonly ?string $apiToken = null,
         private readonly ?string $ingestToken = null,
     ) {
-        if (($this->apiToken ?? '') === '' && ($this->ingestToken ?? '') === '') {
-            throw new \InvalidArgumentException('apiToken or ingestToken is required');
-        }
     }
 
     public static function fromEnv(): self
@@ -92,7 +90,7 @@ final class StationClient
     private function request(string $method, string $url, ?string $body, bool $ingest): array
     {
         $token = $ingest ? $this->ingestToken : $this->apiToken;
-        if ($token === null || $token === '') {
+        if ($ingest && ($token === null || $token === '')) {
             throw new \RuntimeException('Missing bearer token');
         }
 
@@ -101,10 +99,10 @@ final class StationClient
             throw new \RuntimeException('curl_init failed');
         }
 
-        $headers = [
-            'Authorization: Bearer ' . $token,
-            'Accept: application/json',
-        ];
+        $headers = ['Accept: application/json'];
+        if ($token !== null && $token !== '') {
+            $headers[] = 'Authorization: Bearer ' . $token;
+        }
         if ($body !== null) {
             $headers[] = 'Content-Type: application/json';
         }

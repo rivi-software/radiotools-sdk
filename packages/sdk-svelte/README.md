@@ -17,7 +17,7 @@ Requires Svelte 4 or newer.
   import { createStationClient } from "@rivi-software/radiotools-sdk";
   import { createGetNowPlayingStore } from "@rivi-software/radiotools-sdk-svelte";
 
-  const client = createStationClient({ baseUrl, stationSlug, apiToken });
+  const client = createStationClient({ baseUrl, stationSlug });
   const nowPlaying = createGetNowPlayingStore(client);
 </script>
 
@@ -29,6 +29,8 @@ Requires Svelte 4 or newer.
   <p>{$nowPlaying.data?.track?.title}</p>
 {/if}
 ```
+
+Without `apiToken` the client reads anonymously, which works for a station that allows anonymous reads (**Settings › Listener APIs**). For a station that requires a token, keep it on your server and read through it there; never bundle the token in browser code.
 
 ## Stores
 

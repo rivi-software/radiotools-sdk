@@ -27,6 +27,7 @@ public final class StationClient: @unchecked Sendable {
     private let ingestToken: String?
     private let session: URLSession
 
+    /// Leave \`apiToken\` nil for a station that allows anonymous reads.
     public init(
         baseURL: URL,
         stationSlug: String,
@@ -34,9 +35,6 @@ public final class StationClient: @unchecked Sendable {
         ingestToken: String? = nil,
         session: URLSession = .shared
     ) throws {
-        guard apiToken?.isEmpty == false || ingestToken?.isEmpty == false else {
-            throw RadioToolsSDKError.missingToken
-        }
         self.baseURL = baseURL
         self.stationSlug = stationSlug
         self.apiToken = apiToken
@@ -127,9 +125,13 @@ public final class StationClient: @unchecked Sendable {
         return object as? [String: Any] ?? [:]
     }
 
-    private func bearer(ingest: Bool) throws -> String {
+    /// \`nil\` for a listener read without an \`apiToken\`, which goes out anonymously.
+    private func bearer(ingest: Bool) throws -> String? {
         let token = ingest ? ingestToken : apiToken
-        guard let token, !token.isEmpty else { throw RadioToolsSDKError.missingToken }
+        guard let token, !token.isEmpty else {
+            if ingest { throw RadioToolsSDKError.missingToken }
+            return nil
+        }
         return "Bearer \\(token)"
     }
 

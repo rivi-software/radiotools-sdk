@@ -147,8 +147,6 @@ class RadioToolsStationClient:
         ingest_token: str | None = None,
         client: httpx.Client | None = None,
     ) -> None:
-        if not api_token and not ingest_token:
-            raise ValueError("api_token or ingest_token is required")
         self.base_url = base_url.rstrip("/")
         self.station_slug = station_slug
         self.api_token = api_token
@@ -157,10 +155,12 @@ class RadioToolsStationClient:
         self._resources: dict[str, Any] | None = None
 
     def _headers(self, *, ingest: bool = False) -> dict[str, str]:
+        """Listener reads without an api_token go out anonymously, for a station that allows them."""
         token = self.ingest_token if ingest else self.api_token
         if not token:
-            scope = "ingest:write" if ingest else "listener:read"
-            raise ValueError(f"Missing token for {scope}")
+            if not ingest:
+                return {}
+            raise ValueError("Missing token for ingest:write")
         return {"Authorization": f"Bearer {token}"}
 
     def _get_json(self, path: str, *, params: dict[str, Any] | None = None) -> dict[str, Any]:

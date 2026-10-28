@@ -8,7 +8,7 @@ Regenerate after contract changes:
 bun run generate -- --target python
 ```
 
-This package provides a minimal `httpx` client for the listener reads and playback ingest. Reads follow the resource links of the station document, and a disabled resource raises `LookupError`.
+This package provides a minimal `httpx` client for the listener reads and playback ingest. Reads follow the resource links of the station document, and a disabled resource raises `LookupError`. Without `api_token` (`RADIOTOOLS_API_TOKEN`) reads go out anonymously, for a station that allows anonymous reads (**Settings › Listener APIs**).
 
 News, presenters, shows and pages have the same fixed fields on every station, so their reads are typed (`radiotools_sdk.types`):
 

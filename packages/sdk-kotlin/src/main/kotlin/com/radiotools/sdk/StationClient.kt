@@ -24,6 +24,7 @@ class StationClient private constructor(
     private val json: Json,
 ) {
     companion object {
+        /** Leave [apiToken] null for a station that allows anonymous reads. */
         fun create(
             baseUrl: String,
             stationSlug: String,
@@ -31,9 +32,6 @@ class StationClient private constructor(
             ingestToken: String? = null,
             http: OkHttpClient? = null,
         ): StationClient {
-            require(!apiToken.isNullOrBlank() || !ingestToken.isNullOrBlank()) {
-                "apiToken or ingestToken is required"
-            }
             val client =
                 http
                     ?: OkHttpClient.Builder()
@@ -96,7 +94,7 @@ class StationClient private constructor(
         val request =
             Request.Builder()
                 .url(url.toHttpUrl())
-                .header("Authorization", bearer(ingest))
+                .apply { bearer(ingest)?.let { header("Authorization", it) } }
                 .get()
                 .build()
         http.newCall(request).execute().use { response ->
@@ -113,7 +111,7 @@ class StationClient private constructor(
         val request =
             Request.Builder()
                 .url(url)
-                .header("Authorization", bearer(ingest))
+                .apply { bearer(ingest)?.let { header("Authorization", it) } }
                 .post(payload.toRequestBody(mediaType))
                 .build()
         http.newCall(request).execute().use { response ->
@@ -123,9 +121,13 @@ class StationClient private constructor(
         }
     }
 
-    private fun bearer(ingest: Boolean): String {
+    /** `null` for a listener read without an [apiToken], which goes out anonymously. */
+    private fun bearer(ingest: Boolean): String? {
         val token = if (ingest) ingestToken else apiToken
-        require(!token.isNullOrBlank()) { "Missing bearer token" }
+        if (token.isNullOrBlank()) {
+            require(!ingest) { "Missing bearer token" }
+            return null
+        }
         return "Bearer $token"
     }
 

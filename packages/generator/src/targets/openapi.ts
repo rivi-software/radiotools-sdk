@@ -6,6 +6,11 @@ import {
 } from "../openapi/zod-components.js";
 import type { SdkTarget } from "../types.js";
 
+/** Listener reads: the station key, or none (the empty requirement) on a station that allows anonymous reads. */
+const listenerSecurity = [{ bearerListener: [] }, {}];
+const listenerUnauthorized =
+  "Missing (on a station that requires one), invalid, expired, revoked, wrong-scope or cross-station listener token";
+
 function errorResponseContent() {
   return {
     "application/json": {
@@ -41,7 +46,7 @@ function renderOpenApi(): string {
         operationId: "getStation",
         summary: "Published station metadata",
         tags: ["listener"],
-        security: [{ bearerListener: [] }],
+        security: listenerSecurity,
         parameters: [
           {
             name: "stationSlug",
@@ -52,7 +57,7 @@ function renderOpenApi(): string {
         ],
         responses: {
           "200": successResponse("getStation"),
-          "401": { description: "Missing or invalid listener token", content: errorResponseContent() },
+          "401": { description: listenerUnauthorized, content: errorResponseContent() },
           "404": { description: "Station not found", content: errorResponseContent() },
         },
       },
@@ -161,7 +166,7 @@ function renderOpenApi(): string {
         summary: method.description,
         ...(method.deprecated ? { deprecated: true } : {}),
         tags: ["listener"],
-        security: [{ bearerListener: [] }],
+        security: listenerSecurity,
         parameters: [
           { name: "stationSlug", in: "path", required: true, schema: { type: "string" } },
           ...extraParams.map((param) => ({
@@ -173,7 +178,7 @@ function renderOpenApi(): string {
         ],
         responses: {
           "200": successResponse(method.name),
-          "401": { description: "Unauthorized", content: errorResponseContent() },
+          "401": { description: listenerUnauthorized, content: errorResponseContent() },
           "404": { description: "Resource disabled or not found", content: errorResponseContent() },
         },
       },
@@ -185,7 +190,7 @@ function renderOpenApi(): string {
           operationId: "getContentRecord",
           summary: "One published content record by id",
           tags: ["listener"],
-          security: [{ bearerListener: [] }],
+          security: listenerSecurity,
           parameters: [
             { name: "stationSlug", in: "path", required: true, schema: { type: "string" } },
             { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
@@ -201,7 +206,7 @@ function renderOpenApi(): string {
           operationId: "getContentBySlug",
           summary: "One published content record by type and slug; former slugs also resolve",
           tags: ["listener"],
-          security: [{ bearerListener: [] }],
+          security: listenerSecurity,
           parameters: [
             { name: "stationSlug", in: "path", required: true, schema: { type: "string" } },
             { name: "type", in: "path", required: true, schema: { type: "string" } },
@@ -231,7 +236,11 @@ function renderOpenApi(): string {
       },
     ],
     tags: [
-      { name: "listener", description: "Requires listener:read (RADIOTOOLS_API_TOKEN)" },
+      {
+        name: "listener",
+        description:
+          "Requires listener:read (RADIOTOOLS_API_TOKEN), unless the station allows anonymous reads in Settings › Listener APIs",
+      },
       { name: "ingest", description: "Requires ingest:write (RADIOTOOLS_INGEST_TOKEN)" },
     ],
     components: {

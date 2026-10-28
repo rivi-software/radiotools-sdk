@@ -3,7 +3,7 @@ import { createStationClient } from "../src/client.js";
 import { asContentType } from "../src/content-types.js";
 import { createEtagCache } from "../src/http.js";
 import { stationClientOptionsFromEnv } from "../src/env.js";
-import { readPreviewHandoff } from "../src/preview.js";
+import { previewEditorial, readPreviewHandoff } from "../src/preview.js";
 import { PUBLIC_SOCKET_PROTOCOL, sdkSchemas } from "../src/schemas.js";
 import { subscribePublicFeed } from "../src/realtime.js";
 
@@ -954,16 +954,80 @@ test("reportPlayback uses the ingest token and reuses eventId across retries", a
   expect(bodies[0]?.eventId?.length).toBeGreaterThan(0);
 });
 
-test("listener reads require a listener token", async () => {
+test("without a listener token, reads go out anonymously over REST and GraphQL", async () => {
+  for (const transport of ["http", "graphql"] as const) {
+    const authorization: (string | null)[] = [];
+    const client = createStationClient({
+      baseUrl: "https://radio.example",
+      stationSlug: "station-a",
+      transport,
+      fetch: async (_url, init) => {
+        authorization.push(new Headers(init?.headers).get("authorization"));
+        return transport === "http"
+          ? Response.json(stationBody)
+          : Response.json({ data: { station: { ...stationBody, profile: null } } });
+      },
+    });
+    expect((await client.getStation()).slug).toBe("station-a");
+    expect(authorization).toEqual([null]);
+  }
+});
+
+test("an anonymous read of a station that requires a token answers the API's 401", async () => {
   const client = createStationClient({
     baseUrl: "https://radio.example",
     stationSlug: "station-a",
     ingestToken: "ingest-token",
+    fetch: async (_url, init) => {
+      expect(new Headers(init?.headers).get("authorization")).toBeNull();
+      return Response.json(
+        {
+          error: {
+            code: "UNAUTHENTICATED",
+            message: "Authentication required",
+            requestId: "00000000-0000-4000-8000-000000000001",
+          },
+        },
+        { status: 401 },
+      );
+    },
   });
-  await expect(client.getStation()).rejects.toThrow(/listener:read/);
+  await expect(client.getStation()).rejects.toMatchObject({ code: "UNAUTHENTICATED", status: 401 });
 });
 
-test("environment options accept either customer credential", () => {
+test("GraphQL preview sends only the grant when there is no listener token", async () => {
+  let headers: Headers | undefined;
+  const preview = previewEditorial({
+    baseUrl: "https://radio.example",
+    stationSlug: "station-a",
+    transport: "graphql",
+    grant: "grant-token",
+    input: {
+      stationId: "station-a",
+      recordId: "00000000-0000-4000-8000-000000000010",
+      revision: 1,
+      audience: "website",
+    },
+    fetch: async (_url, init) => {
+      headers = new Headers(init?.headers);
+      return Response.json({
+        data: null,
+        errors: [{ message: "Not found", extensions: { code: "NOT_FOUND" } }],
+      });
+    },
+  });
+  await expect(preview).rejects.toMatchObject({ code: "NOT_FOUND" });
+  expect(headers?.get("authorization")).toBeNull();
+  expect(headers?.get("x-preview-grant")).toBe("grant-token");
+});
+
+test("environment options take either customer credential or none", () => {
+  expect(
+    stationClientOptionsFromEnv({
+      RADIOTOOLS_BASE_URL: "https://radio.example",
+      RADIOTOOLS_STATION_SLUG: "breeze",
+    }),
+  ).toEqual({ baseUrl: "https://radio.example", stationSlug: "breeze" });
   expect(
     stationClientOptionsFromEnv({
       RADIOTOOLS_BASE_URL: "https://radio.example",
