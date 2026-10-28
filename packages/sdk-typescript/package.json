@@ -1,6 +1,6 @@
 {
   "name": "@rivi-software/radiotools-sdk",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Customer SDK for radio stations. Published listener reads and playback ingest only.",
   "license": "MIT",
   "type": "module",
