@@ -10,7 +10,7 @@ The package imports `server-only`, so it can only be used in Server Components, 
 npm install @rivi-software/radiotools-sdk-next @rivi-software/radiotools-sdk
 ```
 
-Requires Next.js 14.2 or newer. Set `RADIOTOOLS_BASE_URL`, `RADIOTOOLS_STATION_SLUG` and `RADIOTOOLS_API_TOKEN` in the server environment.
+Requires Next.js 14.2 or newer. Set `RADIOTOOLS_BASE_URL`, `RADIOTOOLS_STATION_SLUG` and `RADIOTOOLS_API_TOKEN` in the server environment. Leave `RADIOTOOLS_API_TOKEN` unset for a station that allows anonymous reads (**Settings › Listener APIs**).
 
 ## Usage
 

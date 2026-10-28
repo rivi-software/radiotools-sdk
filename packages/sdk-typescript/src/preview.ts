@@ -7,7 +7,10 @@ export type PreviewEditorialOptions = {
   baseUrl: string;
   /** Short-lived preview grant. Pass it explicitly. Never read it from the query string. */
   grant: string;
-  /** Required for GraphQL preview. REST preview uses only the grant. */
+  /**
+   * Listener credential for GraphQL preview, unless the station allows anonymous reads. REST
+   * preview uses only the grant.
+   */
   apiToken?: string;
   input: SdkPreviewInput;
   fetch?: FetchLike;
@@ -30,7 +33,6 @@ export async function previewEditorial(
 
   if (options.transport === "graphql") {
     if (!options.stationSlug) throw new Error("stationSlug is required for GraphQL preview");
-    if (!options.apiToken) throw new Error("Listener API token is required for GraphQL preview");
     const endpoint = new URL(
       `/api/v1/stations/${encodeURIComponent(options.stationSlug)}/graphql`,
       options.baseUrl,

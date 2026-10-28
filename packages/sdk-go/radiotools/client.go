@@ -22,10 +22,8 @@ type StationClient struct {
 	HTTPClient  *http.Client
 }
 
+// NewStationClient builds a client. Leave apiToken empty for a station that allows anonymous reads.
 func NewStationClient(baseURL, stationSlug, apiToken, ingestToken string) (*StationClient, error) {
-	if apiToken == "" && ingestToken == "" {
-		return nil, fmt.Errorf("apiToken or ingestToken is required")
-	}
 	return &StationClient{
 		BaseURL:     strings.TrimRight(baseURL, "/"),
 		StationSlug: stationSlug,
@@ -58,11 +56,13 @@ func (c *StationClient) getJSON(ctx context.Context, path string, ingest bool) (
 	token := c.APIToken
 	if ingest {
 		token = c.IngestToken
+		if token == "" {
+			return nil, fmt.Errorf("missing bearer token")
+		}
 	}
-	if token == "" {
-		return nil, fmt.Errorf("missing bearer token")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
 	res, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return nil, err

@@ -13,10 +13,9 @@ public sealed class StationClient : IDisposable
     private readonly string? _apiToken;
     private readonly string? _ingestToken;
 
+    /// <summary>Leave <paramref name="apiToken"/> null for a station that allows anonymous reads.</summary>
     public StationClient(string baseUrl, string stationSlug, string? apiToken = null, string? ingestToken = null, HttpClient? http = null)
     {
-        if (string.IsNullOrWhiteSpace(apiToken) && string.IsNullOrWhiteSpace(ingestToken))
-            throw new ArgumentException("apiToken or ingestToken is required");
         _baseUrl = baseUrl.TrimEnd('/');
         _stationSlug = stationSlug;
         _apiToken = apiToken;
@@ -95,7 +94,10 @@ public sealed class StationClient : IDisposable
     {
         var token = ingest ? _ingestToken : _apiToken;
         if (string.IsNullOrWhiteSpace(token))
-            throw new InvalidOperationException("Missing bearer token");
+        {
+            if (ingest) throw new InvalidOperationException("Missing bearer token");
+            return;
+        }
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
     }
 

@@ -16,10 +16,20 @@ Create keys in RadioTools under **Settings → API credentials**.
 | --- | --- |
 | `RADIOTOOLS_BASE_URL` | API base URL |
 | `RADIOTOOLS_STATION_SLUG` | Station to read from |
-| `RADIOTOOLS_API_TOKEN` | Station key (`listener:read`) |
+| `RADIOTOOLS_API_TOKEN` | Station key (`listener:read`); leave it unset for anonymous reads |
 | `RADIOTOOLS_INGEST_TOKEN` | Integration key named `playback` (`ingest:write`) |
 
 Pass the raw `rtm_…` token; the SDK adds the `Bearer ` prefix.
+
+### Anonymous reads
+
+A station can switch on **Allow anonymous reads** under **Settings › Listener APIs**. Its listener reads (REST, GraphQL and GraphQL preview) then answer without a token, so a static site, a mobile app or a smart-speaker skill can use the SDK directly, in the browser or on the device. Leave `apiToken` out:
+
+```ts
+const client = createStationClient({ baseUrl: "https://api.example.com", stationSlug: "my-station" });
+```
+
+Anyone who knows the station slug can then read the same published data. A station that has not switched it on answers each read with `401 UNAUTHENTICATED` (`RadioToolsApiError`). A token you do pass is always checked, even on a station that allows anonymous reads, so a revoked or expired one keeps failing with `401`: remove it rather than keep a stale one. Playback ingest still needs `ingestToken`.
 
 ## Usage
 
@@ -106,7 +116,7 @@ subscription.close();
 
 `subscribe` opens the WebSocket in `station.resources.realtime` (null when the station switched realtime off). The socket is anonymous: it starts with the current schedule, on-air state, now playing and published content, then streams changes and reconnects with backoff until closed. The feed's schedule covers today through seven days later. Pass `createSocket` when the runtime has no global `WebSocket`.
 
-Because the feed needs no token, a browser can follow it directly: read the station on your server and hand `station.resources.realtime` and `station.id` to `subscribePublicFeed({ realtime, stationId, handlers })`.
+Because the feed needs no token, a browser can follow it directly: read the station on your server and hand `station.resources.realtime` and `station.id` to `subscribePublicFeed({ realtime, stationId, handlers })`. On a station that allows anonymous reads, the browser can call `client.subscribe` itself.
 
 ### Draft preview on the station website
 

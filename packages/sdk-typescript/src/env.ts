@@ -17,10 +17,8 @@ export function stationClientOptionsFromEnv(env?: RadioToolsEnv): CreateStationC
   const stationSlug = envValue(env, "RADIOTOOLS_STATION_SLUG")?.trim();
   const apiToken = envValue(env, "RADIOTOOLS_API_TOKEN")?.trim();
   const ingestToken = envValue(env, "RADIOTOOLS_INGEST_TOKEN")?.trim();
-  if (!baseUrl || !stationSlug || (!apiToken && !ingestToken)) {
-    throw new Error(
-      "Set RADIOTOOLS_BASE_URL, RADIOTOOLS_STATION_SLUG, and RADIOTOOLS_API_TOKEN or RADIOTOOLS_INGEST_TOKEN.",
-    );
+  if (!baseUrl || !stationSlug) {
+    throw new Error("Set RADIOTOOLS_BASE_URL and RADIOTOOLS_STATION_SLUG.");
   }
   return {
     baseUrl,

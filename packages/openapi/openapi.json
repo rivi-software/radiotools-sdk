@@ -18,7 +18,7 @@
   "tags": [
     {
       "name": "listener",
-      "description": "Requires listener:read (RADIOTOOLS_API_TOKEN)"
+      "description": "Requires listener:read (RADIOTOOLS_API_TOKEN), unless the station allows anonymous reads in Settings › Listener APIs"
     },
     {
       "name": "ingest",
@@ -30,7 +30,7 @@
       "bearerListener": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Station key with listener:read for published JSON and the public socket."
+        "description": "Station key with listener:read for published JSON and GraphQL. Leave it unset for a station that allows anonymous reads (Settings › Listener APIs)."
       },
       "bearerIngest": {
         "type": "http",
@@ -15124,7 +15124,8 @@
         "security": [
           {
             "bearerListener": []
-          }
+          },
+          {}
         ],
         "parameters": [
           {
@@ -15148,7 +15149,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid listener token",
+            "description": "Missing (on a station that requires one), invalid, expired, revoked, wrong-scope or cross-station listener token",
             "content": {
               "application/json": {
                 "schema": {
@@ -15254,7 +15255,8 @@
         "security": [
           {
             "bearerListener": []
-          }
+          },
+          {}
         ],
         "parameters": [
           {
@@ -15278,7 +15280,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized",
+            "description": "Missing (on a station that requires one), invalid, expired, revoked, wrong-scope or cross-station listener token",
             "content": {
               "application/json": {
                 "schema": {
@@ -15310,7 +15312,8 @@
         "security": [
           {
             "bearerListener": []
-          }
+          },
+          {}
         ],
         "parameters": [
           {
@@ -15401,7 +15404,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized",
+            "description": "Missing (on a station that requires one), invalid, expired, revoked, wrong-scope or cross-station listener token",
             "content": {
               "application/json": {
                 "schema": {
@@ -15433,7 +15436,8 @@
         "security": [
           {
             "bearerListener": []
-          }
+          },
+          {}
         ],
         "parameters": [
           {
@@ -15488,7 +15492,8 @@
         "security": [
           {
             "bearerListener": []
-          }
+          },
+          {}
         ],
         "parameters": [
           {
@@ -15550,7 +15555,8 @@
         "security": [
           {
             "bearerListener": []
-          }
+          },
+          {}
         ],
         "parameters": [
           {
@@ -15592,7 +15598,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized",
+            "description": "Missing (on a station that requires one), invalid, expired, revoked, wrong-scope or cross-station listener token",
             "content": {
               "application/json": {
                 "schema": {
@@ -15624,7 +15630,8 @@
         "security": [
           {
             "bearerListener": []
-          }
+          },
+          {}
         ],
         "parameters": [
           {
@@ -15666,7 +15673,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized",
+            "description": "Missing (on a station that requires one), invalid, expired, revoked, wrong-scope or cross-station listener token",
             "content": {
               "application/json": {
                 "schema": {
@@ -15698,7 +15705,8 @@
         "security": [
           {
             "bearerListener": []
-          }
+          },
+          {}
         ],
         "parameters": [
           {
@@ -15722,7 +15730,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized",
+            "description": "Missing (on a station that requires one), invalid, expired, revoked, wrong-scope or cross-station listener token",
             "content": {
               "application/json": {
                 "schema": {
@@ -15754,7 +15762,8 @@
         "security": [
           {
             "bearerListener": []
-          }
+          },
+          {}
         ],
         "parameters": [
           {
@@ -15808,7 +15817,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized",
+            "description": "Missing (on a station that requires one), invalid, expired, revoked, wrong-scope or cross-station listener token",
             "content": {
               "application/json": {
                 "schema": {
@@ -15840,7 +15849,8 @@
         "security": [
           {
             "bearerListener": []
-          }
+          },
+          {}
         ],
         "parameters": [
           {
@@ -15864,7 +15874,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized",
+            "description": "Missing (on a station that requires one), invalid, expired, revoked, wrong-scope or cross-station listener token",
             "content": {
               "application/json": {
                 "schema": {
@@ -15896,7 +15906,8 @@
         "security": [
           {
             "bearerListener": []
-          }
+          },
+          {}
         ],
         "parameters": [
           {
@@ -15939,7 +15950,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized",
+            "description": "Missing (on a station that requires one), invalid, expired, revoked, wrong-scope or cross-station listener token",
             "content": {
               "application/json": {
                 "schema": {
@@ -15971,7 +15982,8 @@
         "security": [
           {
             "bearerListener": []
-          }
+          },
+          {}
         ],
         "parameters": [
           {
@@ -16002,7 +16014,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized",
+            "description": "Missing (on a station that requires one), invalid, expired, revoked, wrong-scope or cross-station listener token",
             "content": {
               "application/json": {
                 "schema": {
@@ -16034,7 +16046,8 @@
         "security": [
           {
             "bearerListener": []
-          }
+          },
+          {}
         ],
         "parameters": [
           {
@@ -16065,7 +16078,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized",
+            "description": "Missing (on a station that requires one), invalid, expired, revoked, wrong-scope or cross-station listener token",
             "content": {
               "application/json": {
                 "schema": {

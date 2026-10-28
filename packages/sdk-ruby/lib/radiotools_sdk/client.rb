@@ -7,9 +7,8 @@ require "uri"
 
 module RadioTools
   class StationClient
+    # Leave api_token out for a station that allows anonymous reads.
     def initialize(base_url:, station_slug:, api_token: nil, ingest_token: nil)
-      raise ArgumentError, "api_token or ingest_token is required" if api_token.to_s.empty? && ingest_token.to_s.empty?
-
       @base_url = base_url.to_s.chomp("/")
       @station_slug = station_slug
       @api_token = api_token
@@ -74,7 +73,11 @@ module RadioTools
 
     def apply_auth!(request, ingest)
       token = ingest ? @ingest_token : @api_token
-      raise ArgumentError, "missing bearer token" if token.to_s.empty?
+      if token.to_s.empty?
+        raise ArgumentError, "missing bearer token" if ingest
+
+        return
+      end
 
       request["Authorization"] = "Bearer #{token}"
     end

@@ -86,7 +86,8 @@ export const listenerSdkManifest: SdkManifest = {
     {
       name: "RADIOTOOLS_API_TOKEN",
       required: false,
-      description: "Station key with listener:read for published JSON and the public socket.",
+      description:
+        "Station key with listener:read for published JSON and GraphQL. Leave it unset for a station that allows anonymous reads (Settings › Listener APIs).",
     },
     {
       name: "RADIOTOOLS_INGEST_TOKEN",

@@ -34,7 +34,10 @@ export function createEtagCache(): EtagCache {
 
 export type PublicJsonRequestOptions = {
   fetch?: FetchLike;
-  /** Station credential with listener:read. Keep it on the station's server. */
+  /**
+   * Station credential with listener:read. Keep it on the station's server. Omit it for a
+   * station that allows anonymous reads (Settings › Listener APIs).
+   */
   apiToken?: string;
   etagCache?: EtagCache;
   cache?: RequestCache;

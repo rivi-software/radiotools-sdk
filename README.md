@@ -150,6 +150,8 @@ Create keys in RadioTools under **Settings → API credentials**.
 
 Store them as `RADIOTOOLS_API_TOKEN` and `RADIOTOOLS_INGEST_TOKEN`. Pass the raw `rtm_…` value. The SDK adds the `Bearer ` prefix.
 
+A station that switches on **Allow anonymous reads** (**Settings › Listener APIs**) needs no station key for its listener reads: leave `RADIOTOOLS_API_TOKEN` unset and the SDK reads without one, from a server, a browser or an app. See [Anonymous reads](packages/sdk-typescript/README.md#anonymous-reads).
+
 Also set `RADIOTOOLS_BASE_URL` and `RADIOTOOLS_STATION_SLUG`.
 
 ```ts

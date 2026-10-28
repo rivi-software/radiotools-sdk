@@ -63,7 +63,10 @@ export type StationClientTransport = "http" | "graphql" | "auto";
 export type CreateStationClientOptions = {
   baseUrl: string;
   stationSlug: string;
-  /** Credential with `listener:read`. Required for published reads. */
+  /**
+   * Credential with `listener:read`. Omit it for a station that allows anonymous reads
+   * (Settings › Listener APIs); a station that does not answers its reads with 401.
+   */
   apiToken?: string;
   /** Integration credential named `playback` with `ingest:write`. Required for `reportPlayback`. */
   ingestToken?: string;
@@ -251,9 +254,6 @@ function useGraphql(options: CreateStationClientOptions): boolean {
 export function createStationClient(options: CreateStationClientOptions): StationClient {
   const listenerToken = options.apiToken?.trim() ?? "";
   const ingestToken = options.ingestToken?.trim() ?? "";
-  if (!listenerToken && !ingestToken) {
-    throw new Error("A listener API token or playback ingest token is required");
-  }
   if (!options.stationSlug.trim()) throw new Error("stationSlug is required");
 
   const stationPath = `/api/v1/stations/${encodeURIComponent(options.stationSlug)}`;
@@ -267,10 +267,6 @@ export function createStationClient(options: CreateStationClientOptions): Statio
   };
   const graphqlEndpoint = absoluteUrl(options.baseUrl, `${stationPath}/graphql`);
   let stationCache: SdkPublicStation | null = null;
-
-  const requireListenerToken = () => {
-    if (!listenerToken) throw new Error("Listener API token (listener:read) is required");
-  };
 
   async function preferGraphql<T>(graphql: () => Promise<T>, http: () => Promise<T>): Promise<T> {
     if (!useGraphql(options)) return http();
@@ -293,7 +289,6 @@ export function createStationClient(options: CreateStationClientOptions): Statio
   };
 
   const getStation = async (): Promise<SdkPublicStation> => {
-    requireListenerToken();
     return preferGraphql(async () => {
       const data = await graphqlRequest<{ station: unknown }>(
         graphqlEndpoint,
@@ -727,7 +722,6 @@ export function createStationClient(options: CreateStationClientOptions): Statio
       });
     },
     subscribe: (handlers) => {
-      requireListenerToken();
       let inner: PublicFeedSubscription | null = null;
       let closed = false;
       void getStation()
