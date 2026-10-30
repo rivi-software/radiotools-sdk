@@ -1,5 +1,15 @@
 # @rivi-software/radiotools-sdk
 
+## 0.8.1
+
+### Patch Changes
+
+- 027938c: Depend on `zod` 4.6.7.
+
+  **Fixed**
+
+  - `@rivi-software/radiotools-sdk` and `@rivi-software/radiotools-sdk-generator` pinned `zod` 4.6.5, which can exhaust memory while validating oversized constrained collections ([GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5)). They now pin 4.6.7.
+
 ## 0.8.0
 
 ### Minor Changes
