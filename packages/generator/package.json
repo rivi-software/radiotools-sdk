@@ -36,6 +36,6 @@
   "dependencies": {
     "@rivi-software/radiotools-contract": "^0.8.0",
     "@rivi-software/radiotools-sdk": "^0.8.0",
-    "zod": "4.6.5"
+    "zod": "4.6.7"
   }
 }
