@@ -2,6 +2,8 @@
 
 Thanks for your interest in the RadioTools SDK.
 
+Everyone who takes part in this project, including in issues, must follow our [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Pull requests
 
 We don't accept pull requests. RIVI Software maintains this repository, and we close pull requests without merging them.
