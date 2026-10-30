@@ -1,0 +1,46 @@
+name: Close external pull requests
+
+# We don't accept pull requests (see CONTRIBUTING.md). pull_request_target runs
+# in the base repository's context, so the token can close pull requests from
+# forks. Never check out or run pull request code in this workflow.
+on:
+  pull_request_target:
+    types:
+      - opened
+
+permissions:
+  pull-requests: write
+
+jobs:
+  close:
+    name: Close with a comment
+    # Changesets and Dependabot open their pull requests as bots.
+    if: github.event.pull_request.user.type != 'Bot'
+    # Only calls the GitHub API, so a GitHub-hosted runner is enough.
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Close unless the author can write to the repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          permission="$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$AUTHOR/permission" --jq .permission)"
+          case "$permission" in
+            admin | write)
+              echo "$AUTHOR has $permission access, so #$NUMBER stays open."
+              exit 0
+              ;;
+          esac
+
+          repo_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          cat > "$RUNNER_TEMP/comment.md" <<EOF
+          Hi @$AUTHOR, thanks for taking the time to open this pull request.
+
+          We don't accept pull requests on this repository. RIVI Software maintains the RadioTools SDK, so we're closing this one without merging it. See [CONTRIBUTING.md]($repo_url/blob/main/CONTRIBUTING.md) for details.
+
+          If you found a bug, a missing feature or a mistake in the docs, please [open an issue]($repo_url/issues/new) and tell us what you'd like to change. RadioTools customers can also reach us privately at [support.rivi.software](https://support.rivi.software) or [support@rivi.software](mailto:support@rivi.software).
+          EOF
+
+          gh pr comment "$NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/comment.md"
+          gh pr close "$NUMBER" --repo "$GITHUB_REPOSITORY"
