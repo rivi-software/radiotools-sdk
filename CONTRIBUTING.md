@@ -17,6 +17,8 @@ If you find a bug, a missing feature or a mistake in the docs, please [open an i
 
 Issues are public. Never include your `rtm_…` keys, `RADIOTOOLS_API_TOKEN`, `RADIOTOOLS_INGEST_TOKEN` or other station details you want to keep private.
 
+Don't open an issue for a security vulnerability. Report it privately as described in the [Security policy](SECURITY.md).
+
 ## Customer support
 
 RadioTools customers can also get help privately:

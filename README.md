@@ -171,6 +171,7 @@ The starters for other languages carry versions of their own. The listener contr
 
 - **Questions about your account or station:** create a ticket at [support.rivi.software](https://support.rivi.software) or email [support@rivi.software](mailto:support@rivi.software).
 - **Bugs, missing features and mistakes in the docs:** [open an issue](https://github.com/rivi-software/radiotools-sdk/issues/new). Issues are public, so never include your keys.
+- **Security vulnerabilities:** report them privately, never in an issue. See the [Security policy](SECURITY.md).
 - **Pull requests:** we don't accept them. RIVI Software maintains this repository. See [Contributing](CONTRIBUTING.md).
 
 ---
