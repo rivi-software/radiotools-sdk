@@ -8,6 +8,8 @@ The TypeScript client is hand-written and complete (REST, GraphQL, WebSocket, ET
 
 Licensed under the [MIT License](LICENSE).
 
+We don't accept pull requests, but we welcome issues. Customers can also get help at [support.rivi.software](https://support.rivi.software). See [Contributing](CONTRIBUTING.md).
+
 ## Quick start
 
 ```bash
