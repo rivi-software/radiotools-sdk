@@ -74,7 +74,9 @@ Each item is the broadcast as `getSchedule` shows it (`id`, `title`, `startsAt`,
 
 ### Weather and traffic
 
-`getWeather()` and `getTraffic()` return `null` when the station does not publish them. Each weather snapshot and the traffic snapshot name their `source`: `open-meteo`, `openweathermap` or `station` for weather, `anwb`, `ndw` or `station` for traffic, where `station` is the station's own feed. The SDK accepts any source, so a station can switch providers without an SDK update. OpenWeatherMap asks for a visible credit, "Weather data provided by OpenWeather".
+`getWeather()` and `getTraffic()` return `null` when the station does not publish them. Each weather snapshot and the traffic snapshot name their `source`: `open-meteo`, `openweathermap` or `station` for weather, `anwb`, `ndw`, `tomtom`, `here` or `station` for traffic, where `station` is the station's own feed. The SDK accepts any source, so a station can switch providers without an SDK update. OpenWeatherMap asks for a visible credit, "Weather data provided by OpenWeather".
+
+A station's traffic covers one country: the Netherlands, Belgium, Luxembourg or Germany. Watched roads have `{country}:{road}` ids such as `nl:a12`, `be:e40` or `de:a3`, and an incident's `summary` is the provider's text in that country's language.
 
 ### Content
 
@@ -106,7 +108,7 @@ Cursors are opaque strings. Records carry `firstPublishedAt` (corrections do not
 
 ```ts
 const subscription = client.subscribe({
-  onNowPlaying: (nowPlaying) => console.log(nowPlaying.track?.title),
+  onNowPlaying: (nowPlaying) => console.log(nowPlaying?.track?.title),
   onContent: (recordId, record) => {
     // record is null when it was unpublished
   },
@@ -115,6 +117,8 @@ subscription.close();
 ```
 
 `subscribe` opens the WebSocket in `station.resources.realtime` (null when the station switched realtime off). The socket is anonymous: it starts with the current schedule, on-air state, now playing and published content, then streams changes and reconnects with backoff until closed. The feed's schedule covers today through seven days later. Pass `createSocket` when the runtime has no global `WebSocket`.
+
+`onSchedule`, `onAir` and `onNowPlaying` take `null` when the feed has no row of their kind, so clear what you show. That happens when the feed removes the row (the station went offline, or switched realtime or that API off), and on a (re)connect whose snapshot has none. `onAir` is also `null` while nothing is on air.
 
 Because the feed needs no token, a browser can follow it directly: read the station on your server and hand `station.resources.realtime` and `station.id` to `subscribePublicFeed({ realtime, stationId, handlers })`. On a station that allows anonymous reads, the browser can call `client.subscribe` itself.
 

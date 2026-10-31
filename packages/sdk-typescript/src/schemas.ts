@@ -903,7 +903,13 @@ export const WeatherPublic = z
   })
   .strict();
 
-const TrafficRoadId = z.string().regex(/^nl:[an](?:[0-9]{1,3}|-all)$/, "Use nl:{road} watch ids");
+/**
+ * `{country}:{road}`, with the road from the station's traffic country: `nl:a12`, `be:e40`,
+ * `de:a3`, or `{country}:{type}-all` for every road of one type.
+ */
+const TrafficRoadId = z
+  .string()
+  .regex(/^[a-z]{2}:[a-z](?:[0-9]{1,3}|-all)$/, "Use {country}:{road} watch ids, such as nl:a12");
 const TrafficWatchRoad = z
   .object({
     id: TrafficRoadId,
@@ -945,15 +951,15 @@ const TrafficIncident = z
     closure: z
       .enum(["road", "entry", "exit", "entry_and_exit", "connector", "lane", "heavy_vehicles"])
       .nullable(),
-    /** The provider's own text (Dutch). */
+    /** The provider's own text, in the language of the station's traffic country. */
     summary: z.string(),
     updatedAt: z.string().datetime(),
   })
   .strict();
 /**
  * Who reported the incidents: `anwb` (RadioTools' data), `ndw` (the Netherlands' national road
- * data) or `station` (the station's own feed). Any other source a later RadioTools release adds
- * parses too.
+ * data), `tomtom` or `here` (on the station's own key) or `station` (the station's own feed). Any
+ * other source a later RadioTools release adds parses too.
  */
 const TrafficSource = z.string().min(1);
 const TrafficSnapshot = z
