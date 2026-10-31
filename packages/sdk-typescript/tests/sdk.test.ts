@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { Kind, parse, type SelectionSetNode } from "graphql";
 import { createStationClient } from "../src/client.js";
 import { asContentType } from "../src/content-types.js";
 import { createEtagCache } from "../src/http.js";
@@ -782,6 +783,7 @@ test("station profile, programme slots and traffic causes parse", () => {
             weekday: 6,
             startTime: "10:00",
             durationMinutes: 120,
+            endTime: "12:00",
             timezone: "Europe/Amsterdam",
             intervalWeeks: 1,
             fromDate: "2026-01-01",
@@ -1154,6 +1156,7 @@ const onDemandItem = {
   description: "Monday's edition",
   startsAt: "2026-10-26T06:00:00.000Z",
   endsAt: "2026-10-26T08:00:00.000Z",
+  endTime: "09:00",
   timezone: "Europe/Amsterdam",
   localDate: "2026-10-26",
   nature: "live",
@@ -1258,12 +1261,133 @@ test("GraphQL reads on-demand and the station's on-demand link", async () => {
   expect(requests[1]?.variables).toEqual({ programId: undefined, cursor: "page-2", limit: 25 });
 });
 
+/** What a GraphQL server answers: only the fields `set` selects, from the complete `value`. */
+function selected(set: SelectionSetNode, value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((item) => selected(set, item));
+  if (!value || typeof value !== "object") return value;
+  const record = value as Record<string, unknown>;
+  return Object.fromEntries(
+    set.selections.flatMap((node) =>
+      node.kind === Kind.FIELD
+        ? [
+            [
+              node.name.value,
+              node.selectionSet
+                ? selected(node.selectionSet, record[node.name.value])
+                : record[node.name.value],
+            ],
+          ]
+        : [],
+    ),
+  );
+}
+
+test("GraphQL schedule, shows, current broadcast and on-demand reads select every field their contracts need", async () => {
+  // Complete answers as the API returns them, with no field left to a default; the server
+  // answers only what the SDK's query selects, so a field the query leaves out fails the read.
+  const presenter = { id: "00000000-0000-4000-8000-000000000051", title: "Anna" };
+  const program = { id: "00000000-0000-4000-8000-000000000052", title: "Late", profileId: null };
+  const broadcast = {
+    id: "00000000-0000-4000-8000-000000000050",
+    title: "Late",
+    startsAt: "2026-11-01T21:00:00.000Z",
+    endsAt: "2026-11-01T23:00:00.000Z",
+    endTime: "23:59",
+    timezone: "Europe/Amsterdam",
+    localDate: "2026-11-01",
+    resolution: "exact/exact",
+    status: "scheduled",
+    cancellationReason: "",
+    repeatOfId: null,
+    nature: "nonstop",
+    program,
+    presenters: [presenter],
+  };
+  const envelope = { contractVersion: 1, timezone: "Europe/Amsterdam" };
+  const answers = {
+    SdkSchedule: {
+      schedule: sdkSchemas.PublicSchedule.parse({ ...envelope, broadcasts: [broadcast], truncated: false }),
+    },
+    SdkCurrentBroadcast: {
+      currentBroadcast: sdkSchemas.PublicCurrentBroadcast.parse({
+        ...envelope,
+        asOf: "2026-11-01T22:00:00.000Z",
+        broadcast,
+      }),
+    },
+    SdkShows: {
+      shows: sdkSchemas.PublicShows.parse({
+        ...envelope,
+        fromDate: "2026-11-01",
+        throughDate: "2026-11-01",
+        truncated: false,
+        shows: [
+          {
+            ...program,
+            type: "nonstop",
+            presenters: [presenter],
+            slots: [
+              {
+                weekday: 0,
+                startTime: "22:00",
+                durationMinutes: 120,
+                endTime: "23:59",
+                timezone: "Europe/Amsterdam",
+                intervalWeeks: 1,
+                fromDate: "2026-01-01",
+                throughDate: "2026-12-31",
+                presenters: [presenter],
+              },
+            ],
+          },
+        ],
+      }),
+    },
+    SdkOnDemand: {
+      onDemand: sdkSchemas.PublicOnDemand.parse({
+        ...envelope,
+        items: [{ ...onDemandItem, endTime: "23:59", nature: "nonstop" }],
+        nextCursor: null,
+      }),
+    },
+  };
+  const client = createStationClient({
+    baseUrl: "https://radio.example",
+    stationSlug: "station-a",
+    apiToken: "fixture-api-token",
+    transport: "graphql",
+    fetch: async (_url, init) => {
+      const { query } = JSON.parse(String(init?.body)) as { query: string };
+      const operation = parse(query).definitions[0];
+      if (operation?.kind !== Kind.OPERATION_DEFINITION) throw new Error("operation");
+      const name = operation.name?.value;
+      if (!name || !(name in answers))
+        return Response.json({ data: { station: { ...onDemandStation, profile: null } } });
+      const answer = answers[name as keyof typeof answers];
+      return Response.json({ data: selected(operation.selectionSet, answer) });
+    },
+  });
+  const window = { fromDate: "2026-11-01", throughDate: "2026-11-01" };
+
+  const schedule = await client.getSchedule(window);
+  expect(schedule).toEqual(answers.SdkSchedule.schedule);
+  expect(schedule.broadcasts[0]?.endTime).toBe("23:59");
+  expect(await client.getCurrentBroadcast()).toEqual(answers.SdkCurrentBroadcast.currentBroadcast);
+  const shows = await client.getShows(window);
+  expect(shows).toEqual(answers.SdkShows.shows);
+  expect(shows.shows[0]?.slots[0]?.endTime).toBe("23:59");
+  const onDemand = await client.getOnDemand();
+  expect(onDemand).toEqual(answers.SdkOnDemand.onDemand);
+  expect(onDemand?.items[0]?.endTime).toBe("23:59");
+});
+
 test("nonstop broadcasts and show types parse; a show without a type is live", () => {
   const broadcast = {
     id: "00000000-0000-4000-8000-000000000040",
     title: "Night",
     startsAt: "2026-10-26T22:00:00.000Z",
     endsAt: "2026-10-27T05:00:00.000Z",
+    endTime: "06:00",
     timezone: "Europe/Amsterdam",
     localDate: "2026-10-27",
     resolution: "regular",

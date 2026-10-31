@@ -53,7 +53,7 @@ const schedule = await client.getSchedule({ fromDate: "2026-10-06", throughDate:
 
 `getStation`, `getSchemas`, `getContent`, `getContentRecord`, `getContentBySlug`, `iterateContent`, `getSchedule`, `getShows`, `getCurrentBroadcast`, `getNowPlaying`, `getTrackHistory`, `iterateTrackHistory`, `getOnDemand`, `iterateOnDemand`, `getWeather`, `getTraffic`, `recommendedPollIntervalMs`, `previewEditorial`, `reportPlayback`, `subscribe`.
 
-Schedule windows are `YYYY-MM-DD` dates covering 1 to 42 inclusive days. Shows include their presenters and regular `slots` (weekday, start time, duration) and have a `type` of `live`, `nonstop` (automation playing music) or `prerecorded`; broadcasts carry a `nature` of `live`, `nonstop`, `prerecorded` or `repeat`. `station.profile` holds the tagline, frequency label, links and contact details once the station has saved them.
+Schedule windows are `YYYY-MM-DD` dates covering 1 to 42 inclusive days. Shows include their presenters and regular `slots` (weekday, start time, duration, end time) and have a `type` of `live`, `nonstop` (automation playing music) or `prerecorded`; broadcasts carry a `nature` of `live`, `nonstop`, `prerecorded` or `repeat`. Broadcasts, slots and on-demand items have an `endTime`: the end as `HH:MM` in their `timezone`, the way a schedule shows it, so one that ends at midnight reads `23:59`, not `00:00`. Show `endTime`, and compute with the exact `endsAt`. `station.profile` holds the tagline, frequency label, links and contact details once the station has saved them.
 
 ### On-demand recordings
 
@@ -70,7 +70,7 @@ for await (const item of client.iterateOnDemand({ programId })) {
 }
 ```
 
-Each item is the broadcast as `getSchedule` shows it (`id`, `title`, `startsAt`, `endsAt`, `nature`, `program`, `presenters`) plus `description` and `audio`: an anonymous, byte-range capable URL on the same origin as `station.resources.media`, with `mime`, `size` and `durationSeconds`. `station.resources.onDemand` is `null` while the station has its schedule or media library switched off.
+Each item is the broadcast as `getSchedule` shows it (`id`, `title`, `startsAt`, `endsAt`, `endTime`, `nature`, `program`, `presenters`) plus `description` and `audio`: an anonymous, byte-range capable URL on the same origin as `station.resources.media`, with `mime`, `size` and `durationSeconds`. `station.resources.onDemand` is `null` while the station has its schedule or media library switched off.
 
 ### Weather and traffic
 

@@ -294,6 +294,8 @@ scalar JSON
     weekday: Int!
     startTime: String!
     durationMinutes: Int!
+    "HH:MM in timezone as a schedule shows it: a slot until midnight reads 23:59."
+    endTime: String!
     timezone: String!
     intervalWeeks: Int!
     fromDate: String!
@@ -361,6 +363,8 @@ scalar JSON
     title: String!
     startsAt: String!
     endsAt: String!
+    "HH:MM in timezone as a schedule shows it: a broadcast until midnight reads 23:59."
+    endTime: String!
     timezone: String!
     localDate: String!
     resolution: String!
@@ -395,6 +399,8 @@ scalar JSON
     description: String!
     startsAt: String!
     endsAt: String!
+    "HH:MM in timezone as the schedule showed it: one that ended at midnight reads 23:59."
+    endTime: String!
     timezone: String!
     localDate: String!
     "live, nonstop, prerecorded or repeat"
