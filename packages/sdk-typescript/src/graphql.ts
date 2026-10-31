@@ -63,6 +63,7 @@ const broadcastFields = `
   title
   startsAt
   endsAt
+  endTime
   timezone
   localDate
   resolution
@@ -248,6 +249,7 @@ const showFields = /* GraphQL */ `
     weekday
     startTime
     durationMinutes
+    endTime
     timezone
     intervalWeeks
     fromDate
@@ -292,6 +294,7 @@ export const onDemandQuery = /* GraphQL */ `
         description
         startsAt
         endsAt
+        endTime
         timezone
         localDate
         nature

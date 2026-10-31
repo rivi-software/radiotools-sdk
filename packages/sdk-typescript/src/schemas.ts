@@ -573,11 +573,17 @@ const LocalDate = z.iso.date();
 export const BroadcastNature = z.enum(["live", "nonstop", "prerecorded", "repeat"]);
 /** What kind of show it is; its broadcasts take the type as their `nature` unless set apart. */
 export const ShowType = z.enum(["live", "nonstop", "prerecorded"]);
+const TimeOfDay = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 export const PublicBroadcast = z.object({
   id: z.uuid(),
   title: z.string(),
   startsAt: z.iso.datetime(),
   endsAt: z.iso.datetime(),
+  /**
+   * The end as a schedule shows it, `HH:MM` on the clock of `timezone`: a broadcast that ends at
+   * midnight reads `23:59`. `endsAt` stays the exact end.
+   */
+  endTime: TimeOfDay,
   timezone: Timezone,
   localDate: LocalDate,
   resolution: z.string(),
@@ -602,8 +608,10 @@ const PublicPresenter = z.object({ id: z.uuid(), title: z.string() });
  */
 export const PublicProgramSlot = z.object({
   weekday: z.number().int().min(0).max(6),
-  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  startTime: TimeOfDay,
   durationMinutes: z.number().int().min(1).max(1440),
+  /** The end as a schedule shows it, wall time in `timezone`: a slot until midnight reads `23:59`. */
+  endTime: TimeOfDay,
   timezone: Timezone,
   intervalWeeks: z.number().int().min(1).max(8),
   fromDate: LocalDate,
@@ -645,6 +653,8 @@ export const PublicOnDemandBroadcast = z.object({
   description: z.string(),
   startsAt: z.iso.datetime(),
   endsAt: z.iso.datetime(),
+  /** The end as the schedule showed it, `HH:MM` in `timezone`: one that ended at midnight reads `23:59`. */
+  endTime: TimeOfDay,
   timezone: Timezone,
   localDate: LocalDate,
   nature: BroadcastNature,
