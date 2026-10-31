@@ -9,10 +9,15 @@ import {
   sdkSchemas,
 } from "./schemas.js";
 
+/**
+ * `onSchedule`, `onAir` and `onNowPlaying` take `null` when the feed has no row of their kind: it
+ * removed it (the station went offline, or switched its realtime feed or that API off), or the
+ * snapshot a (re)connect starts with has none. `onAir` also takes `null` while nothing is on air.
+ */
 export type PublicFeedHandlers = {
-  onSchedule?: (data: SdkPublicSchedule) => void;
+  onSchedule?: (data: SdkPublicSchedule | null) => void;
   onAir?: (data: SdkPublicOnAir | null) => void;
-  onNowPlaying?: (data: SdkPublicNowPlaying) => void;
+  onNowPlaying?: (data: SdkPublicNowPlaying | null) => void;
   /** `data` is `null` when the record was unpublished. */
   onContent?: (recordId: string, data: SdkPublishedRecord | null) => void;
   onError?: (error: unknown) => void;
@@ -97,10 +102,35 @@ function dispatchFeedEvent(message: SdkPublicSocketEvent, handlers: PublicFeedHa
   }
 }
 
+/** The kinds the feed keeps one row of (`<kind>/default`). */
+const SINGLE_ROW_KINDS = ["schedule", "on-air", "now-playing"] as const;
+type SingleRowKind = (typeof SINGLE_ROW_KINDS)[number];
+
+function isSingleRowKind(kind: unknown): kind is SingleRowKind {
+  return SINGLE_ROW_KINDS.includes(kind as SingleRowKind);
+}
+
+/** Reports that the feed has no row of `kind`. */
+function dispatchRemoved(kind: SingleRowKind, handlers: PublicFeedHandlers) {
+  switch (kind) {
+    case "schedule":
+      handlers.onSchedule?.(null);
+      return;
+    case "on-air":
+      handlers.onAir?.(null);
+      return;
+    case "now-playing":
+      handlers.onNowPlaying?.(null);
+      return;
+  }
+}
+
 /**
  * Follow a station's public feed: schedule, on-air state, now playing and published content.
  * The socket is anonymous, so this also works from a browser. Each (re)connect starts with the
- * station's current rows, and the connection reconnects with backoff until `close()`.
+ * station's current rows, and the connection reconnects with backoff until `close()`. A removed
+ * schedule, on-air or now-playing row reaches its handler as `null`, and so does one the snapshot
+ * has no row of, once the snapshot ends.
  */
 export function subscribePublicFeed(options: SubscribePublicFeedOptions): PublicFeedSubscription {
   const { realtime, stationId, handlers } = options;
@@ -110,32 +140,52 @@ export function subscribePublicFeed(options: SubscribePublicFeedOptions): Public
   let attempt = 0;
   let retry: ReturnType<typeof setTimeout> | undefined;
 
-  const handleRow = (row: FeedRow, deleted: boolean) => {
+  /** `snapshot` collects the kinds of the rows a connection's snapshot has, until it ends. */
+  const handleRow = (row: FeedRow, deleted: boolean, snapshot: Set<unknown> | null) => {
     if (row.station_id !== stationId) return;
     if (deleted) {
       if (row.kind === "content" && typeof row.entry === "string") {
         handlers.onContent?.(row.entry, null);
+      } else if (isSingleRowKind(row.kind)) {
+        dispatchRemoved(row.kind, handlers);
       }
       return;
     }
+    snapshot?.add(row.kind);
     const message = parseFeedEvent(row.data_json);
     if (message) dispatchFeedEvent(message, handlers);
   };
 
   const open = () => {
     if (closed) return;
+    let current: WebSocket;
     try {
-      socket = options.createSocket ? options.createSocket(url) : new WebSocket(url);
+      current = options.createSocket ? options.createSocket(url) : new WebSocket(url);
     } catch (error) {
       handlers.onError?.(error);
       return;
     }
-    socket.addEventListener("open", () => {
-      attempt = 0;
+    socket = current;
+    let snapshot: Set<unknown> | null = new Set();
+    current.addEventListener("open", () => {
+      // The feed sends its snapshot before the socket opens and answers `ping` on the same
+      // socket, so the first `pong` arrives after the snapshot's last row.
+      current.send("ping");
     });
-    socket.addEventListener("message", (event) => {
+    current.addEventListener("message", (event) => {
       const data = typeof event.data === "string" ? event.data : String(event.data);
-      if (data === "pong") return;
+      if (data === "pong") {
+        if (snapshot) {
+          for (const kind of SINGLE_ROW_KINDS) {
+            if (!snapshot.has(kind)) dispatchRemoved(kind, handlers);
+          }
+          snapshot = null;
+          // Reset the backoff only once a snapshot arrives, so a feed that keeps refusing
+          // connections backs off instead of reconnecting every second.
+          attempt = 0;
+        }
+        return;
+      }
       let frame: FeedFrame;
       try {
         frame = JSON.parse(data);
@@ -149,12 +199,12 @@ export function subscribePublicFeed(options: SubscribePublicFeedOptions): Public
       if (frame.type !== "event" || !frame.data?.payload) return;
       if (frame.data.channels && !frame.data.channels.includes(realtime.channel)) return;
       const deleted = (frame.data.events ?? []).some((name) => name.endsWith(".delete"));
-      handleRow(frame.data.payload, deleted);
+      handleRow(frame.data.payload, deleted, snapshot);
     });
-    socket.addEventListener("error", (error) => {
+    current.addEventListener("error", (error) => {
       handlers.onError?.(error);
     });
-    socket.addEventListener("close", () => {
+    current.addEventListener("close", () => {
       socket = null;
       if (closed) return;
       const delay = RETRY_MS[Math.min(attempt, RETRY_MS.length - 1)];

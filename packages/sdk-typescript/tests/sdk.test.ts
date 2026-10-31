@@ -241,6 +241,7 @@ class MockSocket {
   static instances: MockSocket[] = [];
   url = "";
   closed = false;
+  sent: string[] = [];
   listeners: Record<string, ((event: { data: string }) => void)[]> = {};
   constructor(url: string) {
     this.url = url;
@@ -248,6 +249,9 @@ class MockSocket {
   }
   addEventListener(type: string, listener: (event: { data: string }) => void) {
     this.listeners[type] = [...(this.listeners[type] ?? []), listener];
+  }
+  send(data: string) {
+    this.sent.push(data);
   }
   close() {
     this.closed = true;
@@ -336,6 +340,108 @@ test("public feed reconnects after the socket closes", async () => {
   subscription.close();
   MockSocket.instances[1]?.fire("close");
   expect(MockSocket.instances).toHaveLength(2);
+});
+
+test("public feed reports a removed schedule, on-air or now-playing row as null", () => {
+  MockSocket.instances = [];
+  const reported: string[] = [];
+  const subscription = subscribePublicFeed({
+    realtime: { url: stationBody.resources.realtime.url, channel: feedChannel },
+    stationId: "station-a",
+    handlers: {
+      onSchedule: (data) => reported.push(`schedule:${data === null ? "null" : "data"}`),
+      onAir: (data) => reported.push(`on-air:${data === null ? "null" : "data"}`),
+      onNowPlaying: (data) => reported.push(`now-playing:${data === null ? "null" : "data"}`),
+    },
+    createSocket: (url) => new MockSocket(url) as unknown as WebSocket,
+  });
+  const socket = MockSocket.instances[0];
+  if (!socket) throw new Error("socket was not created");
+
+  socket.row("create", {
+    station_id: "station-a",
+    kind: "schedule",
+    entry: "default",
+    data_json: JSON.stringify(scheduleEvent),
+  });
+  socket.row("create", { station_id: "station-a", kind: "on-air", entry: "default", data_json: "{}" });
+  socket.row("create", { station_id: "station-a", kind: "now-playing", entry: "default", data_json: "{}" });
+  socket.fire("message", "pong");
+  expect(reported).toEqual(["schedule:data"]);
+
+  for (const kind of ["now-playing", "on-air", "schedule"]) {
+    socket.row("delete", { station_id: "station-a", kind, entry: "default" });
+  }
+  socket.row("delete", { station_id: "station-b", kind: "schedule", entry: "default" });
+  expect(reported).toEqual(["schedule:data", "now-playing:null", "on-air:null", "schedule:null"]);
+  subscription.close();
+});
+
+test("public feed reports a kind the snapshot has no row of as null once the snapshot ends", () => {
+  MockSocket.instances = [];
+  const reported: string[] = [];
+  const subscription = subscribePublicFeed({
+    realtime: { url: stationBody.resources.realtime.url, channel: feedChannel },
+    stationId: "station-a",
+    handlers: {
+      onSchedule: (data) => reported.push(`schedule:${data === null ? "null" : "data"}`),
+      onAir: (data) => reported.push(`on-air:${data === null ? "null" : "data"}`),
+      onNowPlaying: (data) => reported.push(`now-playing:${data === null ? "null" : "data"}`),
+    },
+    createSocket: (url) => new MockSocket(url) as unknown as WebSocket,
+  });
+  const socket = MockSocket.instances[0];
+  if (!socket) throw new Error("socket was not created");
+
+  socket.row("create", {
+    station_id: "station-a",
+    kind: "schedule",
+    entry: "default",
+    data_json: JSON.stringify(scheduleEvent),
+  });
+  socket.fire("open");
+  expect(socket.sent).toEqual(["ping"]);
+  expect(reported).toEqual(["schedule:data"]);
+
+  socket.fire("message", "pong");
+  expect(reported).toEqual(["schedule:data", "on-air:null", "now-playing:null"]);
+
+  // Only the pong that ends the snapshot reports missing rows.
+  socket.fire("message", "pong");
+  expect(reported).toHaveLength(3);
+  subscription.close();
+});
+
+test("public feed resets its backoff once a snapshot arrives, not when the socket opens", () => {
+  MockSocket.instances = [];
+  const subscription = subscribePublicFeed({
+    realtime: { url: stationBody.resources.realtime.url, channel: feedChannel },
+    stationId: "station-a",
+    handlers: {},
+    createSocket: (url) => new MockSocket(url) as unknown as WebSocket,
+  });
+  const original = setTimeout;
+  const delays: number[] = [];
+  globalThis.setTimeout = ((handler: () => void, delay?: number) => {
+    delays.push(delay ?? 0);
+    handler();
+    return 0;
+  }) as typeof setTimeout;
+  try {
+    // Opened and closed before any snapshot: the feed refused it.
+    MockSocket.instances[0]?.fire("open");
+    MockSocket.instances[0]?.fire("close");
+    MockSocket.instances[1]?.fire("open");
+    MockSocket.instances[1]?.fire("close");
+    // A snapshot arrived, so the next drop starts the backoff again.
+    MockSocket.instances[2]?.fire("open");
+    MockSocket.instances[2]?.fire("message", "pong");
+    MockSocket.instances[2]?.fire("close");
+  } finally {
+    globalThis.setTimeout = original;
+  }
+  expect(delays).toEqual([1_000, 2_000, 1_000]);
+  subscription.close();
 });
 
 test("public feed refuses an insecure socket URL", () => {
@@ -1239,7 +1345,7 @@ test("weather and traffic snapshots parse whatever source reported them", () => 
     incidents: [],
     totals: { incidentCount: 0, jamDistanceMeters: 0, delaySeconds: 0 },
   });
-  for (const source of ["anwb", "ndw", "station"]) {
+  for (const source of ["anwb", "ndw", "station", "tomtom", "here"]) {
     const traffic = sdkSchemas.TrafficPublic.parse({
       contractVersion: 1,
       stationId: "station-a",
@@ -1250,4 +1356,30 @@ test("weather and traffic snapshots parse whatever source reported them", () => 
   expect(() =>
     sdkSchemas.TrafficPublic.parse({ contractVersion: 1, stationId: "station-a", snapshot: trafficSnapshot("") }),
   ).toThrow();
+});
+
+test("traffic watch roads parse for every traffic country", () => {
+  const traffic = (ids: string[]) => ({
+    contractVersion: 1,
+    stationId: "station-a",
+    snapshot: {
+      source: "tomtom",
+      watch: { roads: ids.map((id) => ({ id, code: id.split(":")[1]!.toUpperCase(), name: id })) },
+      freshness: {
+        status: "fresh",
+        thresholdSeconds: 300,
+        ageSeconds: 0,
+        fetchedAt: null,
+        observedAt: null,
+        lastError: null,
+      },
+      incidents: [],
+      totals: { incidentCount: 0, jamDistanceMeters: 0, delaySeconds: 0 },
+    },
+  });
+  const ids = ["nl:a12", "nl:n-all", "be:e40", "be:r0", "lu:a1", "de:a3", "de:b9"];
+  expect(sdkSchemas.TrafficPublic.parse(traffic(ids)).snapshot.watch.roads.map((road) => road.id)).toEqual(ids);
+  for (const id of ["a12", "NL:A12", "nl:a1234", "nld:a12"]) {
+    expect(() => sdkSchemas.TrafficPublic.parse(traffic([id]))).toThrow();
+  }
 });

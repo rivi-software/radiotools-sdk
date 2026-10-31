@@ -11608,7 +11608,7 @@
                       "properties": {
                         "id": {
                           "type": "string",
-                          "pattern": "^nl:[an](?:[0-9]{1,3}|-all)$"
+                          "pattern": "^[a-z]{2}:[a-z](?:[0-9]{1,3}|-all)$"
                         },
                         "code": {
                           "type": "string",

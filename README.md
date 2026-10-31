@@ -157,6 +157,7 @@ A station that switches on **Allow anonymous reads** (**Settings › Listener AP
 
 The npm packages share one version number and are released together. Before 1.0, a minor release can change behavior or remove a method, so read the [changelog](packages/sdk-typescript/CHANGELOG.md) before you upgrade:
 
+- Releases up to 0.8.1 refuse the traffic of a station whose traffic covers Belgium, Luxembourg or Germany, and keep showing a schedule or now playing that the realtime feed removed. Upgrade to 0.9.0 or later.
 - Reading a station without a token, for anonymous reads, needs 0.8.0 or later.
 - Releases up to 0.6.0 refuse a `nonstop` broadcast, and weather or traffic from a source other than Open-Meteo or ANWB. The API has sent these since 28 October 2026, so upgrade to 0.7.0 or later.
 
