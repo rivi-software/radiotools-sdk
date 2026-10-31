@@ -36,4 +36,4 @@ For a vulnerability in the RadioTools service itself, such as the API, the realt
 
 ## Leaked keys
 
-A station key or integration credential that has leaked, for example in a public repository or in browser code, isn't a vulnerability in the SDK. Revoke it in RadioTools under **Settings › Credentials** and create a new one. See [Authentication](https://docs.rivi.software/radiotools/api-reference/authentication).
+A station key or integration credential that has leaked, for example in a public repository or in browser code, isn't a vulnerability in the SDK. Revoke it in RadioTools under **Settings › Credentials** and create a new one. See [Authentication](https://help.rivi.software/radiotools/api-reference/authentication).

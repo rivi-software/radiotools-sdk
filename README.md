@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://docs.rivi.software/radiotools/api-reference/sdks">
+  <a href="https://help.rivi.software/radiotools/api-reference/sdks">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="assets/radiotools-wordmark-on-dark.svg">
       <img src="assets/radiotools-wordmark.svg" alt="RadioTools" width="280">
@@ -18,9 +18,9 @@
 </p>
 
 <p align="center">
-  <a href="https://docs.rivi.software/radiotools/api-reference/sdks">Documentation</a>
+  <a href="https://help.rivi.software/radiotools/api-reference/sdks">Documentation</a>
   ·
-  <a href="https://docs.rivi.software/radiotools/api-reference/sdks/typescript">TypeScript guide</a>
+  <a href="https://help.rivi.software/radiotools/api-reference/sdks/typescript">TypeScript guide</a>
   ·
   <a href="https://support.rivi.software">Support</a>
   ·
@@ -57,7 +57,7 @@ const nowPlaying = await client.getNowPlaying();
 console.log(`${station.name}: ${nowPlaying.track?.title ?? "nothing on air"}`);
 ```
 
-Set the [environment variables](#credentials) first, or pass the same values to `createStationClient`. The [TypeScript guide](https://docs.rivi.software/radiotools/api-reference/sdks/typescript) covers pagination, realtime updates, caching, errors and playback ingest.
+Set the [environment variables](#credentials) first, or pass the same values to `createStationClient`. The [TypeScript guide](https://help.rivi.software/radiotools/api-reference/sdks/typescript) covers pagination, realtime updates, caching, errors and playback ingest.
 
 ## Choose an SDK
 
@@ -104,7 +104,7 @@ Starter REST clients, generated from the same contract. They cover authenticatio
 | Kotlin | [`com.radiotools.sdk`](packages/sdk-kotlin) | OkHttp and kotlinx.serialization, JVM 17 (Android and JVM) | Copy or vendor the folder |
 | Swift | [`RadioToolsSDK`](packages/sdk-swift) | `URLSession` with async/await, Swift 6, iOS 16 or macOS 13 | Swift Package Manager, by this repository's URL |
 
-None of these are published to PyPI, NuGet, RubyGems, Packagist or Maven Central. See [Other languages](https://docs.rivi.software/radiotools/api-reference/sdks/other-languages) for a per-language method table and examples.
+None of these are published to PyPI, NuGet, RubyGems, Packagist or Maven Central. See [Other languages](https://help.rivi.software/radiotools/api-reference/sdks/other-languages) for a per-language method table and examples.
 
 ### Contract and tooling
 
@@ -130,7 +130,7 @@ The framework bindings wrap the station, current broadcast, now playing, the fir
 
 ## Credentials
 
-Create keys in RadioTools under **Settings › Credentials**. See [Integrations](https://support.rivi.software/integrations) in the help center and [Authentication](https://docs.rivi.software/radiotools/api-reference/authentication) in the API reference.
+Create keys in RadioTools under **Settings › Credentials**. See [Integrations](https://support.rivi.software/integrations) in the help center and [Authentication](https://help.rivi.software/radiotools/api-reference/authentication) in the API reference.
 
 | Use | Credential | Scope | Environment variable |
 | --- | --- | --- | --- |
@@ -161,12 +161,12 @@ The npm packages share one version number and are released together. Before 1.0,
 - Reading a station without a token, for anonymous reads, needs 0.8.0 or later.
 - Releases up to 0.6.0 refuse a `nonstop` broadcast, and weather or traffic from a source other than Open-Meteo or ANWB. The API has sent these since 28 October 2026, so upgrade to 0.7.0 or later.
 
-The starters for other languages carry versions of their own. The listener contract is versioned separately through `contractVersion`. See [Errors and versioning](https://docs.rivi.software/radiotools/api-reference/errors-and-versioning).
+The starters for other languages carry versions of their own. The listener contract is versioned separately through `contractVersion`. See [Errors and versioning](https://help.rivi.software/radiotools/api-reference/errors-and-versioning).
 
 ## Other ways in
 
-- Download the [OpenAPI 3.1 document](https://docs.rivi.software/radiotools/openapi.json) to generate a client in any language, or to import into API tools. The same document is in [`packages/openapi`](packages/openapi).
-- Use [GraphQL](https://docs.rivi.software/radiotools/api-reference/graphql) directly with any GraphQL client. The schema is in [`packages/contract/graphql`](packages/contract/graphql).
+- Download the [OpenAPI 3.1 document](https://help.rivi.software/radiotools/openapi.json) to generate a client in any language, or to import into API tools. The same document is in [`packages/openapi`](packages/openapi).
+- Use [GraphQL](https://help.rivi.software/radiotools/api-reference/graphql) directly with any GraphQL client. The schema is in [`packages/contract/graphql`](packages/contract/graphql).
 
 ## Help and contributing
 
