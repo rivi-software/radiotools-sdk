@@ -1,5 +1,37 @@
 # @rivi-software/radiotools-contract
 
+## 0.9.0
+
+### Minor Changes
+
+- 1180618: Read a broadcast's, show slot's or on-demand item's end the way a schedule shows it.
+
+  The listener API added `endTime` to broadcasts, show slots and on-demand items, over REST and GraphQL: the end as `HH:MM` in the item's `timezone`. A show that ends at midnight reads `23:59`, not `00:00`. `endsAt` stays the exact end.
+
+  **Added**
+
+  - `endTime` on what `getSchedule`, `getCurrentBroadcast`, `getShows` (each slot), `getOnDemand` and `iterateOnDemand` return, and on the realtime feed's schedule. The GraphQL queries select it.
+  - `endTime` in the GraphQL schema and the OpenAPI document.
+
+  **Changed**
+
+  - `endTime` is required. Code that builds these types itself, such as a test fixture typed as `SdkPublicSchedule`, `SdkPublicProgramSlot` or `SdkPublicOnDemandBroadcast`, needs to set it.
+
+- f107230: Read traffic from every traffic country, and clear a schedule, on-air state or now playing that the realtime feed removed.
+
+  A station's traffic can now cover the Netherlands, Belgium, Luxembourg or Germany, and come from TomTom or HERE on the station's own key. The realtime feed now removes a station's now-playing row when it switches its now-playing API off, and its schedule and on-air rows when it switches its schedule API off.
+
+  **Fixed**
+
+  - `getTraffic` no longer throws for a station whose traffic covers Belgium, Luxembourg or Germany. Watched roads have `{country}:{road}` ids (`nl:a12`, `be:e40`, `de:a3`), and the OpenAPI document says so.
+  - `subscribe` and `subscribePublicFeed` report a removed schedule, on-air or now-playing row as `null` to `onSchedule`, `onAir` or `onNowPlaying`. Before, the SDK dropped the removal and an app kept showing the old schedule or track.
+  - A (re)connect whose snapshot has no schedule, on-air or now-playing row reports that kind as `null` once the snapshot ends. The SDK sends one `ping` when the socket opens, and the feed's `pong` follows the snapshot's last row.
+  - The feed's reconnect backoff resets once a snapshot arrives, not when the socket opens, so a feed that keeps refusing connections is retried with a growing delay.
+
+  **Changed**
+
+  - `onSchedule` and `onNowPlaying` take `null` as well as data, as `onAir` already did. TypeScript callers that read the data without checking for `null` need a `?.` or a check.
+
 ## 0.8.1
 
 ### Patch Changes
