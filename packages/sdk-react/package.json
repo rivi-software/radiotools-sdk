@@ -1,6 +1,6 @@
 {
   "name": "@rivi-software/radiotools-sdk-react",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "description": "React hooks for @rivi-software/radiotools-sdk (generated from @rivi-software/radiotools-contract)",
   "license": "MIT",
   "type": "module",
@@ -21,7 +21,7 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
-    "@rivi-software/radiotools-sdk": "^0.8.1"
+    "@rivi-software/radiotools-sdk": "^0.9.0"
   },
   "peerDependencies": {
     "react": ">=18"
