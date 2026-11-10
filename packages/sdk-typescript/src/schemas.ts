@@ -33,6 +33,8 @@ export const ErrorResponse = z.object({
           message: z.string(),
           /** Stable reason for a known refusal (for example `slug.taken`), for localized copy. */
           code: z.string().max(64).optional(),
+          /** What the `code`'s localized copy names, as data rather than words (for example a field key). */
+          values: z.record(z.string().max(64), z.string().max(200)).optional(),
           /** A value the request could use instead (for example a free slug). */
           suggestion: z.string().max(200).optional(),
           /** Seconds until a refusal that waiting fixes may succeed. */
