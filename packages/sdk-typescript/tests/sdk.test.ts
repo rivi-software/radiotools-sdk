@@ -1103,6 +1103,38 @@ test("an anonymous read of a station that requires a token answers the API's 401
   await expect(client.getStation()).rejects.toMatchObject({ code: "UNAUTHENTICATED", status: 401 });
 });
 
+test("a refused request's issues keep their code and the values its copy names", async () => {
+  const issue = {
+    path: "items.0.fields.mood",
+    message: "Field mood is not on type song",
+    code: "rundown.field_not_on_type",
+    values: { type: "song", field: "mood" },
+  };
+  const client = createStationClient({
+    baseUrl: "https://radio.example",
+    stationSlug: "station-a",
+    apiToken: "fixture-token",
+    fetch: async () =>
+      Response.json(
+        {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Invalid request",
+            requestId: "00000000-0000-4000-8000-000000000001",
+            issues: [issue],
+          },
+        },
+        { status: 400 },
+      ),
+  });
+  await expect(client.getStation()).rejects.toMatchObject({
+    name: "RadioToolsApiError",
+    code: "VALIDATION_ERROR",
+    status: 400,
+    issues: [issue],
+  });
+});
+
 test("GraphQL preview sends only the grant when there is no listener token", async () => {
   let headers: Headers | undefined;
   const preview = previewEditorial({
