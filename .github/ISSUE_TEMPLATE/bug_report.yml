@@ -1,0 +1,95 @@
+name: Bug report
+description: An SDK, binding or starter does something wrong, or refuses a response the API sends.
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug.
+
+        Issues are public. Never include your `rtm_…` keys, `RADIOTOOLS_API_TOKEN`, `RADIOTOOLS_INGEST_TOKEN` or other station details you want to keep private. Don't open an issue for a security vulnerability: report it privately as described in the [Security policy](https://github.com/rivi-software/radiotools-sdk/blob/main/SECURITY.md).
+
+  - type: dropdown
+    id: packages
+    attributes:
+      label: Package
+      description: Pick every package the bug shows up in.
+      multiple: true
+      options:
+        - "@rivi-software/radiotools-sdk (TypeScript)"
+        - "@rivi-software/radiotools-sdk-react"
+        - "@rivi-software/radiotools-sdk-vue"
+        - "@rivi-software/radiotools-sdk-svelte"
+        - "@rivi-software/radiotools-sdk-next"
+        - Python starter
+        - Go starter
+        - .NET starter
+        - Ruby starter
+        - PHP starter
+        - Kotlin starter
+        - Swift starter
+        - OpenAPI document
+        - "@rivi-software/radiotools-contract"
+        - "@rivi-software/radiotools-sdk-generator"
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: For an npm package, the version you installed (`npm ls @rivi-software/radiotools-sdk` shows it). For a language starter, its version or the commit you copied it from.
+      placeholder: "0.9.0"
+    validations:
+      required: true
+
+  - type: input
+    id: runtime
+    attributes:
+      label: Runtime
+      description: Your runtime or language version, and your framework version if you use a binding.
+      placeholder: Node 22 with Next.js 15, Python 3.12, Swift 6 on iOS 18
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: What you did
+      description: The code you ran or the steps you took. A small example we can run is the quickest way to a fix.
+      placeholder: |
+        const client = createStationClientFromEnv();
+        const traffic = await client.getTraffic();
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Error output
+      description: The full error and stack trace, or the response the SDK refused. This is shown as code, so you don't need backticks.
+      render: text
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Before you submit
+      options:
+        - label: I removed every key, token and station detail I want to keep private from this report.
+          required: true

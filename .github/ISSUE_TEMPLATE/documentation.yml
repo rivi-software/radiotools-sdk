@@ -1,0 +1,32 @@
+name: Documentation mistake
+description: Something in a README or an SDK guide is wrong, unclear or missing.
+labels:
+  - documentation
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Issues are public. Never include your `rtm_…` keys, tokens or other station details you want to keep private.
+
+  - type: input
+    id: location
+    attributes:
+      label: Page or file
+      description: A link to the page, or the path of the file in this repository, and the section if you know it.
+      placeholder: https://help.rivi.software/radiotools/api-reference/sdks/typescript
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's wrong
+      description: Quote the text if it helps, and say what's wrong, unclear or missing.
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: What it should say
+      description: Your suggested wording or example, if you have one.
