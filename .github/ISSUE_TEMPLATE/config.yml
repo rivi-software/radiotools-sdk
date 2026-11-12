@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/rivi-software/radiotools-sdk/security/advisories/new
+    about: Report it privately, never in an issue. You can also email oss-cybersecurity@rivi.software.
+  - name: Get help with your account or station
+    url: https://support.rivi.software
+    about: RadioTools customers can create a private ticket, or email support@rivi.software.
+  - name: Read the SDK documentation
+    url: https://help.rivi.software/radiotools/api-reference/sdks
+    about: Guides for the TypeScript SDK, the framework bindings and the language starters.

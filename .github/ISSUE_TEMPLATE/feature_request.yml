@@ -1,0 +1,59 @@
+name: Feature request
+description: Ask for something an SDK, binding or starter can't do yet.
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The SDKs cover the station-facing routes of listener contract v1. Studio administration and listener messages are out of scope. For questions about your account or station, create a ticket at [support.rivi.software](https://support.rivi.software) instead.
+
+        Issues are public. Never include your `rtm_…` keys, tokens or other station details you want to keep private.
+
+  - type: dropdown
+    id: packages
+    attributes:
+      label: Package
+      description: Pick every package the feature is for.
+      multiple: true
+      options:
+        - "@rivi-software/radiotools-sdk (TypeScript)"
+        - "@rivi-software/radiotools-sdk-react"
+        - "@rivi-software/radiotools-sdk-vue"
+        - "@rivi-software/radiotools-sdk-svelte"
+        - "@rivi-software/radiotools-sdk-next"
+        - Python starter
+        - Go starter
+        - .NET starter
+        - Ruby starter
+        - PHP starter
+        - Kotlin starter
+        - Swift starter
+        - OpenAPI document
+        - "@rivi-software/radiotools-contract"
+        - "@rivi-software/radiotools-sdk-generator"
+        - A language or framework without an SDK yet
+    validations:
+      required: true
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: What you're trying to do
+      description: What you're building, and where the SDK gets in the way.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you'd like the SDK to do
+      description: The method, option or field you'd like, and how you'd call it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: How you work around it now
+      description: For example, a request you make by hand or a field you parse yourself.
