@@ -113,6 +113,41 @@ export const PublicRealtimeDescriptor = z.object({
   channel: z.string().min(1),
 });
 
+/**
+ * A local edition listeners see: a window of its channel's schedule that one area hears in place
+ * of the regular broadcast.
+ */
+export const PublicStationEdition = z.object({
+  id: z.string().min(1).max(80),
+  slug: z.string().min(1).max(40),
+  name: z.string().min(1).max(80),
+  /** The area it serves, as text: its municipalities, for example. */
+  area: z.string().max(300),
+  /** Its own stream, an https link like the profile's; `null` plays its channel's. */
+  streamUrl: HttpsUrl.nullable(),
+});
+
+/**
+ * A channel listeners see. The main channel is the station itself: its `id` is the station's,
+ * its `slug` is `main`, and its stream and frequency label are the profile's.
+ */
+export const PublicStationChannel = z.object({
+  id: z.string().min(1).max(80),
+  /** What the `channel` option takes; `main` for the main channel. */
+  slug: z.string().min(1).max(40),
+  name: z.string().min(1).max(120),
+  main: z.boolean(),
+  /** How listeners tune in, for example "DAB+ 11C". */
+  frequencyLabel: z.string().nullable(),
+  /** The stream listeners play, an https link like the profile's. */
+  streamUrl: HttpsUrl.nullable(),
+  /** Its local editions listeners see, oldest first. */
+  editions: z.array(PublicStationEdition),
+});
+
+/** The channel an item belongs to: the station's id for the main channel. */
+const ChannelId = z.string().min(1).max(80);
+
 export const PublicStation = z.object({
   contractVersion: ListenerContractVersion,
   id: z.string().min(1).max(80),
@@ -122,6 +157,11 @@ export const PublicStation = z.object({
   publishingLanguage: z.string().min(2).max(35),
   /** Present once the station has saved a profile. */
   profile: PublicStationProfile.optional(),
+  /**
+   * The channels listeners see, the main channel first; one while the station has one channel. A
+   * station document from before channels reads as none.
+   */
+  channels: z.array(PublicStationChannel).default([]),
   resources: z.object({
     schemas: href,
     content: href.nullable(),
@@ -596,6 +636,8 @@ export const PublicBroadcast = z.object({
   nature: BroadcastNature.default("live"),
   program: z.object({ id: z.uuid(), title: z.string(), profileId: z.uuid().nullable() }),
   presenters: z.array(z.object({ id: z.uuid(), title: z.string() })),
+  /** The channel it airs on; only when the read named a channel. */
+  channelId: ChannelId.optional(),
 });
 export const PublicSchedule = z.object({
   contractVersion: ListenerContractVersion,
@@ -619,6 +661,8 @@ export const PublicProgramSlot = z.object({
   fromDate: LocalDate,
   throughDate: LocalDate,
   presenters: z.array(PublicPresenter),
+  /** The channel the slot is on; only when the read named a channel. */
+  channelId: ChannelId.optional(),
 });
 export const PublicProgram = z.object({
   id: z.uuid(),
@@ -670,6 +714,8 @@ export const PublicOnDemandBroadcast = z.object({
     size: z.number().int().nonnegative(),
     durationSeconds: z.number().nonnegative().nullable(),
   }),
+  /** The channel it aired on; only when the read named a channel. */
+  channelId: ChannelId.optional(),
 });
 /** One page of a station's published recordings, newest broadcast first. */
 export const PublicOnDemand = z.object({
@@ -786,6 +832,8 @@ export const PublicNowPlaying = z
   .object({
     contractVersion: ListenerContractVersion,
     stationId: z.string(),
+    /** The channel it plays on; only when the read named a channel. */
+    channelId: ChannelId.optional(),
     timezone: Timezone,
     track: PublicPlaybackTrack.nullable(),
     elapsedSeconds: z.number().int().nonnegative().nullable(),
@@ -795,6 +843,8 @@ export const PublicNowPlaying = z
   .strict();
 const PublicHistoryEntry = PublicPlaybackTrack.extend({
   id: z.string().min(1).max(80),
+  /** The channel it played on; only when the read named a channel. */
+  channelId: ChannelId.optional(),
 });
 export const PublicTrackHistory = z
   .object({
@@ -1042,12 +1092,39 @@ export const PublicSocketEvent = z.discriminatedUnion("type", [
     })
     .strict(),
   z.object({ ...socketEnvelope, type: z.literal("preview"), data: RevisionPreview }).strict(),
+  // Another channel's rows: its schedule, on-air and now playing, its id as the row's `entry`.
+  z
+    .object({
+      ...socketEnvelope,
+      channelId: ChannelId,
+      type: z.literal("channel-schedule"),
+      data: PublicSchedule,
+    })
+    .strict(),
+  z
+    .object({
+      ...socketEnvelope,
+      channelId: ChannelId,
+      type: z.literal("channel-on-air"),
+      data: PublicOnAir.nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      ...socketEnvelope,
+      channelId: ChannelId,
+      type: z.literal("channel-now-playing"),
+      data: PublicNowPlaying,
+    })
+    .strict(),
 ]);
 
 export const sdkSchemas = {
   ErrorResponse,
   IngestErrorResponse,
   PublicStation,
+  PublicStationChannel,
+  PublicStationEdition,
   PublicSchema,
   PublicSchemaList,
   PublishedRecord,
@@ -1080,6 +1157,8 @@ export type SdkErrorResponse = z.infer<typeof ErrorResponse>;
 export type SdkErrorCode = z.infer<typeof ErrorCode>;
 export type SdkPublicStation = z.infer<typeof PublicStation>;
 export type SdkPublicStationProfile = z.infer<typeof PublicStationProfile>;
+export type SdkPublicStationChannel = z.infer<typeof PublicStationChannel>;
+export type SdkPublicStationEdition = z.infer<typeof PublicStationEdition>;
 export type SdkPublicRealtimeDescriptor = z.infer<typeof PublicRealtimeDescriptor>;
 export type SdkPublicSchema = z.infer<typeof PublicSchema>;
 export type SdkPublicSchemaList = z.infer<typeof PublicSchemaList>;

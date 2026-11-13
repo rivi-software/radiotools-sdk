@@ -1539,3 +1539,282 @@ test("traffic watch roads parse for every traffic country", () => {
     expect(() => sdkSchemas.TrafficPublic.parse(traffic([id]))).toThrow();
   }
 });
+
+const noordId = "0d000000-0000-4000-8000-000000000001";
+
+/** Station A with a second channel, `noord`, and its recordings on. */
+const channelStationBody = {
+  ...stationBody,
+  resources: { ...stationBody.resources, onDemand: "/api/v1/stations/station-a/on-demand" },
+  channels: [
+    {
+      id: "station-a",
+      slug: "main",
+      name: "Station A",
+      main: true,
+      frequencyLabel: null,
+      streamUrl: null,
+      editions: [],
+    },
+    {
+      id: noordId,
+      slug: "noord",
+      name: "Noord",
+      main: false,
+      frequencyLabel: "DAB+ 11C",
+      streamUrl: "https://stream.example.test/noord",
+      editions: [],
+    },
+  ],
+};
+
+/** An empty schedule; `truncated` tells the main channel's (false) from `noord`'s (true) apart. */
+const emptySchedule = (truncated: boolean) => ({
+  contractVersion: 1,
+  timezone: "UTC",
+  broadcasts: [],
+  truncated,
+});
+
+/** The body each listener read answers on station A, by its path. */
+function channelBody(path: string): unknown {
+  switch (path) {
+    case "/api/v1/stations/station-a":
+      return channelStationBody;
+    case "/api/v1/stations/station-a/schedule":
+      return emptySchedule(false);
+    case "/api/v1/stations/station-a/shows":
+      return {
+        contractVersion: 1,
+        timezone: "UTC",
+        fromDate: "2026-11-12",
+        throughDate: "2026-11-12",
+        shows: [],
+        truncated: false,
+      };
+    case "/api/v1/stations/station-a/broadcast/current":
+      return {
+        contractVersion: 1,
+        timezone: "UTC",
+        asOf: "2026-11-12T07:30:00.000Z",
+        broadcast: null,
+      };
+    case "/api/v1/stations/station-a/now-playing":
+      return { ...nowPlayingBody, channelId: noordId };
+    case "/api/v1/stations/station-a/track-history":
+      return { contractVersion: 1, stationId: "station-a", items: [], nextCursor: null };
+    case "/api/v1/stations/station-a/on-demand":
+      return { contractVersion: 1, timezone: "UTC", items: [], nextCursor: null };
+    default:
+      return null;
+  }
+}
+
+/** A listener API that answers `channelBody`, and the URLs the SDK asked for. */
+function channelApi() {
+  const urls: string[] = [];
+  const fetch = async (input: RequestInfo | URL) => {
+    const url = new URL(String(input));
+    urls.push(`${url.pathname}${url.search}`);
+    const body = channelBody(url.pathname);
+    if (body === null) throw new Error(`unexpected url ${url.href}`);
+    return Response.json(body);
+  };
+  return { urls, fetch };
+}
+
+/** Every read that takes a channel, once each, as a caller passes `call`. */
+async function readAll(
+  client: ReturnType<typeof createStationClient>,
+  call: { channel?: string } = {},
+) {
+  const day = { fromDate: "2026-11-12", throughDate: "2026-11-12" };
+  await client.getSchedule({ ...day, ...call });
+  await client.getShows({ ...day, ...call });
+  await client.getCurrentBroadcast(call);
+  await client.getNowPlaying(call);
+  await client.getTrackHistory(call);
+  await client.getOnDemand(call);
+}
+
+test("channel: the client's channel is named on every read that takes one", async () => {
+  const api = channelApi();
+  await readAll(
+    createStationClient({
+      baseUrl: "https://radio.example",
+      stationSlug: "station-a",
+      channel: "noord",
+      fetch: api.fetch,
+    }),
+  );
+  expect(api.urls.slice(1)).toEqual([
+    "/api/v1/stations/station-a/schedule?fromDate=2026-11-12&throughDate=2026-11-12&channel=noord",
+    "/api/v1/stations/station-a/shows?fromDate=2026-11-12&throughDate=2026-11-12&channel=noord",
+    "/api/v1/stations/station-a/broadcast/current?channel=noord",
+    "/api/v1/stations/station-a/now-playing?channel=noord",
+    "/api/v1/stations/station-a/track-history?limit=25&channel=noord",
+    "/api/v1/stations/station-a/on-demand?limit=25&channel=noord",
+  ]);
+});
+
+test("channel: a call names another, and without either the reads are today's", async () => {
+  const named = channelApi();
+  await readAll(
+    createStationClient({
+      baseUrl: "https://radio.example",
+      stationSlug: "station-a",
+      channel: "noord",
+      fetch: named.fetch,
+    }),
+    { channel: "main" },
+  );
+  const plain = channelApi();
+  await readAll(
+    createStationClient({ baseUrl: "https://radio.example", stationSlug: "station-a", fetch: plain.fetch }),
+  );
+  expect(named.urls.slice(1).every((url) => url.endsWith("channel=main"))).toBe(true);
+  expect(plain.urls.slice(1)).toEqual([
+    "/api/v1/stations/station-a/schedule?fromDate=2026-11-12&throughDate=2026-11-12",
+    "/api/v1/stations/station-a/shows?fromDate=2026-11-12&throughDate=2026-11-12",
+    "/api/v1/stations/station-a/broadcast/current",
+    "/api/v1/stations/station-a/now-playing",
+    "/api/v1/stations/station-a/track-history?limit=25",
+    "/api/v1/stations/station-a/on-demand?limit=25",
+  ]);
+});
+
+test("channel: GraphQL sends the channel's documents only for a named channel", async () => {
+  const requests: { query: string; variables?: Record<string, unknown> }[] = [];
+  const client = createStationClient({
+    baseUrl: "https://radio.example",
+    stationSlug: "station-a",
+    transport: "graphql",
+    fetch: async (_input, init) => {
+      const body = JSON.parse(String(init?.body)) as {
+        query: string;
+        variables?: Record<string, unknown>;
+      };
+      requests.push(body);
+      if (body.query.includes("station {")) return Response.json({ data: { station: channelStationBody } });
+      return Response.json({
+        data: {
+          nowPlaying: body.variables?.channel ? { ...nowPlayingBody, channelId: noordId } : nowPlayingBody,
+        },
+      });
+    },
+  });
+  const named = await client.getNowPlaying({ channel: "noord" });
+  const plain = await client.getNowPlaying();
+  expect(
+    requests.slice(1).map(({ query, variables }) => [query.trim().split(/[\s(]/)[1], variables]),
+  ).toEqual([
+    ["SdkChannelNowPlaying", { channel: "noord" }],
+    ["SdkNowPlaying", undefined],
+  ]);
+  expect(named.channelId).toBe(noordId);
+  expect("channelId" in plain).toBe(false);
+});
+
+test("channel: every GraphQL document is valid against the contract's schema", async () => {
+  const { buildSchema, validate } = await import("graphql");
+  const graphql = await import("../src/graphql.js");
+  const schema = buildSchema(
+    await Bun.file(new URL("../../contract/graphql/schema.graphql", import.meta.url)).text(),
+  );
+  const documents = Object.entries(graphql).flatMap(([name, value]) =>
+    /(?:Query|Mutation)$/.test(name) && typeof value === "string" ? [[name, String(value)] as const] : [],
+  );
+  expect(documents.length).toBeGreaterThan(10);
+  for (const [name, source] of documents) {
+    expect([name, validate(schema, parse(source)).map((error) => error.message)]).toEqual([name, []]);
+  }
+});
+
+test("channel: subscribe follows the named channel's own rows by its id", async () => {
+  MockSocket.instances = [];
+  const truncated: boolean[] = [];
+  const subscription = createStationClient({
+    baseUrl: "https://radio.example",
+    stationSlug: "station-a",
+    fetch: channelApi().fetch,
+    createSocket: (url) => new MockSocket(url) as unknown as WebSocket,
+  }).subscribe({ onSchedule: (data) => truncated.push(data?.truncated ?? false) }, { channel: "noord" });
+  for (let wait = 0; wait < 50 && MockSocket.instances.length === 0; wait++) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  const socket = MockSocket.instances[0];
+  if (!socket) throw new Error("socket was not created");
+  // The main channel's row first, which a subscription to `noord` leaves alone.
+  socket.row("create", {
+    station_id: "station-a",
+    kind: "schedule",
+    entry: "default",
+    data_json: JSON.stringify({
+      protocol: PUBLIC_SOCKET_PROTOCOL,
+      stationId: "station-a",
+      type: "schedule",
+      data: emptySchedule(false),
+    }),
+  });
+  socket.row("create", {
+    station_id: "station-a",
+    kind: "channel-schedule",
+    entry: noordId,
+    data_json: JSON.stringify({
+      protocol: PUBLIC_SOCKET_PROTOCOL,
+      stationId: "station-a",
+      channelId: noordId,
+      type: "channel-schedule",
+      data: emptySchedule(true),
+    }),
+  });
+  subscription.close();
+  expect(truncated).toEqual([true]);
+});
+
+test("channel: subscribe reports a channel listeners can't see", async () => {
+  const errors: string[] = [];
+  createStationClient({
+    baseUrl: "https://radio.example",
+    stationSlug: "station-a",
+    fetch: channelApi().fetch,
+    createSocket: (url) => new MockSocket(url) as unknown as WebSocket,
+  }).subscribe(
+    { onError: (error) => errors.push(error instanceof Error ? error.message : "unknown") },
+    { channel: "zuid" },
+  );
+  for (let wait = 0; wait < 50 && errors.length === 0; wait++) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  expect(errors).toEqual(['The station has no channel "zuid" listeners can see']);
+});
+
+test("channel: a station document from before channels lists none, and items name a channel only when read for one", () => {
+  expect(sdkSchemas.PublicStation.parse(stationBody).channels).toEqual([]);
+  expect(sdkSchemas.PublicStation.parse(channelStationBody).channels.map((channel) => channel.slug)).toEqual([
+    "main",
+    "noord",
+  ]);
+  expect("channelId" in sdkSchemas.PublicNowPlaying.parse(nowPlayingBody)).toBe(false);
+  expect(sdkSchemas.PublicNowPlaying.parse({ ...nowPlayingBody, channelId: noordId }).channelId).toBe(noordId);
+});
+
+test("channel: a channel's or an edition's stream parses only as an https link, as the profile's does", () => {
+  const [main, noord] = channelStationBody.channels;
+  const withStream = (streamUrl: string) =>
+    sdkSchemas.PublicStation.safeParse({ ...channelStationBody, channels: [main, { ...noord, streamUrl }] }).success;
+  const withEditionStream = (streamUrl: string) =>
+    sdkSchemas.PublicStation.safeParse({
+      ...channelStationBody,
+      channels: [
+        main,
+        { ...noord, editions: [{ id: "e1", slug: "ede", name: "Ede", area: "Ede", streamUrl }] },
+      ],
+    }).success;
+  const refused = ["javascript:alert(1)", "http://stream.example.test/noord", "data:audio/mpeg;base64,AAAA"];
+
+  expect(withStream("https://stream.example.test/noord")).toBe(true);
+  expect(withEditionStream("https://stream.example.test/ede")).toBe(true);
+  expect(refused.map(withStream)).toEqual([false, false, false]);
+  expect(refused.map(withEditionStream)).toEqual([false, false, false]);
+});
