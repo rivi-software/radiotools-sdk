@@ -1,4 +1,5 @@
 export {
+  type ChannelOption,
   type ContentFilter,
   type ContentListOptions,
   type CreateStationClientOptions,
@@ -60,6 +61,8 @@ export {
   type SdkPublicShows,
   type SdkPublicSocketEvent,
   type SdkPublicStation,
+  type SdkPublicStationChannel,
+  type SdkPublicStationEdition,
   type SdkPublicStationProfile,
   type SdkPublicTrackHistory,
   type SdkPublishedCollection,

@@ -2,10 +2,13 @@ import {
   contentBySlugQuery,
   contentQuery,
   contentRecordQuery,
+  currentBroadcastChannelQuery,
   currentBroadcastQuery,
   graphqlRequest,
   isGraphqlUnavailable,
+  nowPlayingChannelQuery,
   nowPlayingQuery,
+  onDemandChannelQuery,
   onDemandQuery,
   parseGraphqlContent,
   parseGraphqlCurrentBroadcast,
@@ -19,10 +22,13 @@ import {
   parseGraphqlTrackHistory,
   parseGraphqlTraffic,
   parseGraphqlWeather,
+  scheduleChannelQuery,
   scheduleQuery,
   schemasQuery,
+  showsChannelQuery,
   showsQuery,
   stationQuery,
+  trackHistoryChannelQuery,
   trackHistoryQuery,
   trafficQuery,
   weatherQuery,
@@ -84,6 +90,22 @@ export type CreateStationClientOptions = {
   graphql?: boolean;
   /** Extra attempts after HTTP 429 or 503. Defaults to 2. */
   retries?: number;
+  /**
+   * The channel every read answers for unless a call names another: the `slug` of a channel in
+   * `getStation().channels`, or `main`. Without it the reads answer the main channel exactly as
+   * before channels, without `channelId`.
+   */
+  channel?: string;
+};
+
+/**
+ * A read of one channel: the `slug` of a channel in `getStation().channels`, or `main`. Without
+ * it, the client's `channel`; without either, the main channel exactly as before channels. A read
+ * that names a channel answers its items with `channelId`; a channel listeners can't see answers
+ * 404 (`RadioToolsApiError`).
+ */
+export type ChannelOption = {
+  channel?: string;
 };
 
 /**
@@ -143,12 +165,12 @@ export type ScheduleWindow = {
   throughDate: string;
 };
 
-export type TrackHistoryOptions = {
+export type TrackHistoryOptions = ChannelOption & {
   cursor?: string;
   limit?: number;
 };
 
-export type OnDemandOptions = {
+export type OnDemandOptions = ChannelOption & {
   /** Keep one show's recordings: the `program.id` of its broadcasts. */
   programId?: string;
   cursor?: string;
@@ -177,11 +199,11 @@ export type StationClient = {
   iterateContent: <T extends string>(
     options: Omit<ContentListOptions<T>, "cursor">,
   ) => AsyncGenerator<SdkPublishedRecordOf<T>>;
-  getSchedule: (window: ScheduleWindow) => Promise<SdkPublicSchedule>;
+  getSchedule: (window: ScheduleWindow & ChannelOption) => Promise<SdkPublicSchedule>;
   /** The shows on air in the window, with their regular slots and presenters. */
-  getShows: (window: ScheduleWindow) => Promise<SdkPublicShows>;
-  getCurrentBroadcast: () => Promise<SdkPublicCurrentBroadcast>;
-  getNowPlaying: () => Promise<SdkPublicNowPlaying>;
+  getShows: (window: ScheduleWindow & ChannelOption) => Promise<SdkPublicShows>;
+  getCurrentBroadcast: (options?: ChannelOption) => Promise<SdkPublicCurrentBroadcast>;
+  getNowPlaying: (options?: ChannelOption) => Promise<SdkPublicNowPlaying>;
   getTrackHistory: (options?: TrackHistoryOptions) => Promise<SdkPublicTrackHistory>;
   iterateTrackHistory: (
     options?: Omit<TrackHistoryOptions, "cursor">,
@@ -207,9 +229,23 @@ export type StationClient = {
   /**
    * Follow the station's public feed over its WebSocket. The feed's schedule covers today through
    * seven days later; handlers start from the current state and the socket reconnects until closed.
+   * With a channel, the handlers get that channel's schedule, on-air and now playing; published
+   * content is the station's and reaches them either way.
    */
-  subscribe: (handlers: PublicFeedHandlers) => PublicFeedSubscription;
+  subscribe: (handlers: PublicFeedHandlers, options?: ChannelOption) => PublicFeedSubscription;
 };
+
+/** `href` with `?channel=` when a channel is named, as is without one. */
+function withChannel(href: string, channel: string | undefined): string {
+  return channel ? `${href}?${new URLSearchParams({ channel })}` : href;
+}
+
+/** The window's dates and, when named, the channel, as a read's query parameters. */
+function windowParams(window: ScheduleWindow, channel: string | undefined): URLSearchParams {
+  const params = new URLSearchParams({ fromDate: window.fromDate, throughDate: window.throughDate });
+  if (channel) params.set("channel", channel);
+  return params;
+}
 
 function absoluteUrl(baseUrl: string, path: string): string {
   return new URL(path, baseUrl).href;
@@ -267,6 +303,9 @@ export function createStationClient(options: CreateStationClientOptions): Statio
   };
   const graphqlEndpoint = absoluteUrl(options.baseUrl, `${stationPath}/graphql`);
   let stationCache: SdkPublicStation | null = null;
+
+  /** The channel a call reads: its own, else the client's; none reads as before channels. */
+  const channelOf = (call?: ChannelOption) => call?.channel ?? options.channel;
 
   async function preferGraphql<T>(graphql: () => Promise<T>, http: () => Promise<T>): Promise<T> {
     if (!useGraphql(options)) return http();
@@ -438,21 +477,25 @@ export function createStationClient(options: CreateStationClientOptions): Statio
     } while (cursor);
   }
 
-  const getSchedule = async (window: ScheduleWindow): Promise<SdkPublicSchedule> => {
+  const getSchedule = async (
+    window: ScheduleWindow & ChannelOption,
+  ): Promise<SdkPublicSchedule> => {
     assertScheduleWindow(window);
+    const channel = channelOf(window);
+    const dates = { fromDate: window.fromDate, throughDate: window.throughDate };
     const { href } = await stationFor("schedule", "schedule");
     return preferGraphql(
       async () => {
         const data = await graphqlRequest<{ schedule: unknown }>(
           graphqlEndpoint,
-          scheduleQuery,
-          window,
+          channel ? scheduleChannelQuery : scheduleQuery,
+          channel ? { ...dates, channel } : dates,
           httpOptions,
         );
         return parseGraphqlSchedule(data);
       },
       async () => {
-        const params = new URLSearchParams(window);
+        const params = windowParams(window, channel);
         const { data } = await readPublicJson(
           absoluteUrl(options.baseUrl, `${href}?${params}`),
           sdkSchemas.PublicSchedule,
@@ -463,21 +506,23 @@ export function createStationClient(options: CreateStationClientOptions): Statio
     );
   };
 
-  const getShows = async (window: ScheduleWindow): Promise<SdkPublicShows> => {
+  const getShows = async (window: ScheduleWindow & ChannelOption): Promise<SdkPublicShows> => {
     assertScheduleWindow(window);
+    const channel = channelOf(window);
+    const dates = { fromDate: window.fromDate, throughDate: window.throughDate };
     const { href } = await stationFor("shows", "shows");
     return preferGraphql(
       async () => {
         const data = await graphqlRequest<{ shows: unknown }>(
           graphqlEndpoint,
-          showsQuery,
-          window,
+          channel ? showsChannelQuery : showsQuery,
+          channel ? { ...dates, channel } : dates,
           httpOptions,
         );
         return parseGraphqlShows(data);
       },
       async () => {
-        const params = new URLSearchParams(window);
+        const params = windowParams(window, channel);
         const { data } = await readPublicJson(
           absoluteUrl(options.baseUrl, `${href}?${params}`),
           sdkSchemas.PublicShows,
@@ -488,21 +533,24 @@ export function createStationClient(options: CreateStationClientOptions): Statio
     );
   };
 
-  const getCurrentBroadcast = async (): Promise<SdkPublicCurrentBroadcast> => {
+  const getCurrentBroadcast = async (
+    call?: ChannelOption,
+  ): Promise<SdkPublicCurrentBroadcast> => {
+    const channel = channelOf(call);
     const { href } = await stationFor("broadcast", "broadcast");
     return preferGraphql(
       async () => {
         const data = await graphqlRequest<{ currentBroadcast: unknown }>(
           graphqlEndpoint,
-          currentBroadcastQuery,
-          undefined,
+          channel ? currentBroadcastChannelQuery : currentBroadcastQuery,
+          channel ? { channel } : undefined,
           httpOptions,
         );
         return parseGraphqlCurrentBroadcast(data);
       },
       async () => {
         const { data } = await readPublicJson(
-          absoluteUrl(options.baseUrl, href),
+          absoluteUrl(options.baseUrl, withChannel(href, channel)),
           sdkSchemas.PublicCurrentBroadcast,
           httpOptions,
         );
@@ -511,21 +559,22 @@ export function createStationClient(options: CreateStationClientOptions): Statio
     );
   };
 
-  const getNowPlaying = async (): Promise<SdkPublicNowPlaying> => {
+  const getNowPlaying = async (call?: ChannelOption): Promise<SdkPublicNowPlaying> => {
+    const channel = channelOf(call);
     const { href } = await stationFor("nowPlaying", "now-playing");
     return preferGraphql(
       async () => {
         const data = await graphqlRequest<{ nowPlaying: unknown }>(
           graphqlEndpoint,
-          nowPlayingQuery,
-          undefined,
+          channel ? nowPlayingChannelQuery : nowPlayingQuery,
+          channel ? { channel } : undefined,
           httpOptions,
         );
         return parseGraphqlNowPlaying(data);
       },
       async () => {
         const { data } = await readPublicJson(
-          absoluteUrl(options.baseUrl, href),
+          absoluteUrl(options.baseUrl, withChannel(href, channel)),
           sdkSchemas.PublicNowPlaying,
           httpOptions,
         );
@@ -539,12 +588,13 @@ export function createStationClient(options: CreateStationClientOptions): Statio
   ): Promise<SdkPublicTrackHistory> => {
     const { href } = await stationFor("trackHistory", "track-history");
     const limit = list.limit ?? 25;
+    const channel = channelOf(list);
     return preferGraphql(
       async () => {
         const data = await graphqlRequest<{ trackHistory: unknown }>(
           graphqlEndpoint,
-          trackHistoryQuery,
-          { cursor: list.cursor, limit },
+          channel ? trackHistoryChannelQuery : trackHistoryQuery,
+          channel ? { cursor: list.cursor, limit, channel } : { cursor: list.cursor, limit },
           httpOptions,
         );
         return parseGraphqlTrackHistory(data);
@@ -552,6 +602,7 @@ export function createStationClient(options: CreateStationClientOptions): Statio
       async () => {
         const params = new URLSearchParams({ limit: String(limit) });
         if (list.cursor) params.set("cursor", list.cursor);
+        if (channel) params.set("channel", channel);
         const { data } = await readPublicJson(
           absoluteUrl(options.baseUrl, `${href}?${params}`),
           sdkSchemas.PublicTrackHistory,
@@ -581,12 +632,14 @@ export function createStationClient(options: CreateStationClientOptions): Statio
     if (!station?.resources.onDemand) return null;
     const onDemandHref = station.resources.onDemand;
     const limit = list.limit ?? 25;
+    const channel = channelOf(list);
+    const page = { programId: list.programId, cursor: list.cursor, limit };
     return preferGraphql(
       async () => {
         const data = await graphqlRequest<{ onDemand: unknown }>(
           graphqlEndpoint,
-          onDemandQuery,
-          { programId: list.programId, cursor: list.cursor, limit },
+          channel ? onDemandChannelQuery : onDemandQuery,
+          channel ? { ...page, channel } : page,
           httpOptions,
         );
         return parseGraphqlOnDemand(data);
@@ -595,6 +648,7 @@ export function createStationClient(options: CreateStationClientOptions): Statio
         const params = new URLSearchParams({ limit: String(limit) });
         if (list.programId) params.set("programId", list.programId);
         if (list.cursor) params.set("cursor", list.cursor);
+        if (channel) params.set("channel", channel);
         const { data } = await readPublicJson(
           absoluteUrl(options.baseUrl, `${onDemandHref}?${params}`),
           sdkSchemas.PublicOnDemand,
@@ -721,18 +775,28 @@ export function createStationClient(options: CreateStationClientOptions): Statio
         retries: options.retries,
       });
     },
-    subscribe: (handlers) => {
+    subscribe: (handlers, call) => {
       let inner: PublicFeedSubscription | null = null;
       let closed = false;
+      const channel = channelOf(call);
       void getStation()
         .then((station) => {
           if (closed) return;
           if (!station.resources.realtime) {
             throw new Error("Public realtime is unavailable for this station");
           }
+          // The feed keys another channel's rows by its id; the main channel's are today's rows.
+          const other =
+            channel && channel !== "main"
+              ? station.channels.find((candidate) => candidate.slug === channel)
+              : undefined;
+          if (channel && channel !== "main" && !other) {
+            throw new Error(`The station has no channel "${channel}" listeners can see`);
+          }
           inner = subscribePublicFeed({
             realtime: station.resources.realtime,
             stationId: station.id,
+            channelId: other?.id,
             createSocket: options.createSocket,
             handlers,
           });

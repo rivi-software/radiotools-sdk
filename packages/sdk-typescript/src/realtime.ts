@@ -28,6 +28,13 @@ export type SubscribePublicFeedOptions = {
   realtime: SdkPublicRealtimeDescriptor;
   /** `station.id`; rows for any other station are ignored. */
   stationId: string;
+  /**
+   * The channel to follow, by its `id` in `station.channels`. Left out, or the station's id, the
+   * subscription follows the main channel's rows as before channels; another channel's are its
+   * `channel-schedule`, `channel-on-air` and `channel-now-playing` rows, whose `entry` is its id.
+   * Published content is the station's and reaches every subscription.
+   */
+  channelId?: string;
   handlers: PublicFeedHandlers;
   /** WebSocket factory for runtimes without a global `WebSocket`. */
   createSocket?: (url: string) => WebSocket;
@@ -79,16 +86,34 @@ function parseFeedEvent(raw: unknown): SdkPublicSocketEvent | null {
   return parsed.data;
 }
 
-function dispatchFeedEvent(message: SdkPublicSocketEvent, handlers: PublicFeedHandlers) {
+/**
+ * Hands a frame to its handler: the main channel's kinds while the subscription follows the main
+ * channel (`channelId` null), the `channel-*` kinds of the channel it follows otherwise, and
+ * published content always.
+ */
+function dispatchFeedEvent(
+  message: SdkPublicSocketEvent,
+  handlers: PublicFeedHandlers,
+  channelId: string | null,
+) {
   switch (message.type) {
     case "schedule":
-      handlers.onSchedule?.(message.data);
+      if (channelId === null) handlers.onSchedule?.(message.data);
       return;
     case "on-air":
-      handlers.onAir?.(message.data);
+      if (channelId === null) handlers.onAir?.(message.data);
       return;
     case "now-playing":
-      handlers.onNowPlaying?.(message.data);
+      if (channelId === null) handlers.onNowPlaying?.(message.data);
+      return;
+    case "channel-schedule":
+      if (message.channelId === channelId) handlers.onSchedule?.(message.data);
+      return;
+    case "channel-on-air":
+      if (message.channelId === channelId) handlers.onAir?.(message.data);
+      return;
+    case "channel-now-playing":
+      if (message.channelId === channelId) handlers.onNowPlaying?.(message.data);
       return;
     case "content":
       handlers.onContent?.(message.recordId, message.data);
@@ -109,6 +134,13 @@ type SingleRowKind = (typeof SINGLE_ROW_KINDS)[number];
 function isSingleRowKind(kind: unknown): kind is SingleRowKind {
   return SINGLE_ROW_KINDS.includes(kind as SingleRowKind);
 }
+
+/** Another channel's row kinds, each standing for one of the main channel's. */
+const CHANNEL_ROW_KINDS = new Map<unknown, SingleRowKind>([
+  ["channel-schedule", "schedule"],
+  ["channel-on-air", "on-air"],
+  ["channel-now-playing", "now-playing"],
+]);
 
 /** Reports that the feed has no row of `kind`. */
 function dispatchRemoved(kind: SingleRowKind, handlers: PublicFeedHandlers) {
@@ -134,6 +166,9 @@ function dispatchRemoved(kind: SingleRowKind, handlers: PublicFeedHandlers) {
  */
 export function subscribePublicFeed(options: SubscribePublicFeedOptions): PublicFeedSubscription {
   const { realtime, stationId, handlers } = options;
+  // The main channel's rows are today's kinds; only another channel has rows of its own.
+  const channelId =
+    options.channelId && options.channelId !== stationId ? options.channelId : null;
   const url = secureFeedUrl(realtime.url);
   let closed = false;
   let socket: WebSocket | null = null;
@@ -143,6 +178,19 @@ export function subscribePublicFeed(options: SubscribePublicFeedOptions): Public
   /** `snapshot` collects the kinds of the rows a connection's snapshot has, until it ends. */
   const handleRow = (row: FeedRow, deleted: boolean, snapshot: Set<unknown> | null) => {
     if (row.station_id !== stationId) return;
+    if (channelId !== null && row.kind !== "content") {
+      // Following another channel, only its own rows count, each as the kind it stands for.
+      const kind = row.entry === channelId ? CHANNEL_ROW_KINDS.get(row.kind) : undefined;
+      if (!kind) return;
+      if (deleted) {
+        dispatchRemoved(kind, handlers);
+        return;
+      }
+      snapshot?.add(kind);
+      const message = parseFeedEvent(row.data_json);
+      if (message) dispatchFeedEvent(message, handlers, channelId);
+      return;
+    }
     if (deleted) {
       if (row.kind === "content" && typeof row.entry === "string") {
         handlers.onContent?.(row.entry, null);
@@ -153,7 +201,7 @@ export function subscribePublicFeed(options: SubscribePublicFeedOptions): Public
     }
     snapshot?.add(row.kind);
     const message = parseFeedEvent(row.data_json);
-    if (message) dispatchFeedEvent(message, handlers);
+    if (message) dispatchFeedEvent(message, handlers, channelId);
   };
 
   const open = () => {

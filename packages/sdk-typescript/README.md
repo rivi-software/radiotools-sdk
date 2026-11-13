@@ -55,6 +55,20 @@ const schedule = await client.getSchedule({ fromDate: "2026-10-06", throughDate:
 
 Schedule windows are `YYYY-MM-DD` dates covering 1 to 42 inclusive days. Shows include their presenters and regular `slots` (weekday, start time, duration, end time) and have a `type` of `live`, `nonstop` (automation playing music) or `prerecorded`; broadcasts carry a `nature` of `live`, `nonstop`, `prerecorded` or `repeat`. Broadcasts, slots and on-demand items have an `endTime`: the end as `HH:MM` in their `timezone`, the way a schedule shows it, so one that ends at midnight reads `23:59`, not `00:00`. Show `endTime`, and compute with the exact `endsAt`. `station.profile` holds the tagline, frequency label, links and contact details once the station has saved them.
 
+### Channels
+
+A station can run more than one channel, each with its own schedule, stream and now playing. `station.channels` lists the channels listeners see, the main channel first: its `slug` is `main`, its `id` is the station's `id`, and its `streamUrl` and `frequencyLabel` are the profile's. Pass a channel's `slug` as `channel` to read that channel, on the client for every read or on one call:
+
+```ts
+const noord = createStationClient({ baseUrl, stationSlug: "my-station", apiToken, channel: "noord" });
+
+const nowPlaying = await noord.getNowPlaying(); // nowPlaying.channelId is the channel's id
+const main = await noord.getSchedule({ fromDate: "2026-11-12", throughDate: "2026-11-18", channel: "main" });
+const subscription = noord.subscribe({ onNowPlaying: (data) => console.log(data?.track?.title) });
+```
+
+`getSchedule`, `getShows`, `getCurrentBroadcast`, `getNowPlaying`, `getTrackHistory`, `iterateTrackHistory`, `getOnDemand`, `iterateOnDemand` and `subscribe` take it. Without `channel` they answer the main channel exactly as before. A read that names a channel answers its broadcasts, slots, tracks, recordings and now playing with `channelId`; a channel that is unknown, not published or archived answers 404 (`RadioToolsApiError`), and `subscribe` reports it to `onError`. Each channel's `editions` are its local editions: a window of the channel's schedule that one area hears in place of the regular broadcast.
+
 ### On-demand recordings
 
 ```ts
@@ -117,6 +131,8 @@ subscription.close();
 ```
 
 `subscribe` opens the WebSocket in `station.resources.realtime` (null when the station switched realtime off). The socket is anonymous: it starts with the current schedule, on-air state, now playing and published content, then streams changes and reconnects with backoff until closed. The feed's schedule covers today through seven days later. Pass `createSocket` when the runtime has no global `WebSocket`.
+
+With a `channel` other than `main`, the handlers get that channel's schedule, on-air state and now playing, and never the main channel's; published content reaches them either way.
 
 `onSchedule`, `onAir` and `onNowPlaying` take `null` when the feed has no row of their kind, so clear what you show. That happens when the feed removes the row (the station went offline, or switched realtime or that API off), and on a (re)connect whose snapshot has none. `onAir` is also `null` while nothing is on air.
 

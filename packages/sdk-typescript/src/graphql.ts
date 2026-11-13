@@ -138,6 +138,15 @@ export const stationQuery = /* GraphQL */ `
         traffic
         media
       }
+      channels {
+        id
+        slug
+        name
+        main
+        frequencyLabel
+        streamUrl
+        editions { id slug name area streamUrl }
+      }
       delivery { cache conditional pollIntervalSeconds }
     }
   }
@@ -301,6 +310,136 @@ export const onDemandQuery = /* GraphQL */ `
         program { id title profileId }
         presenters { id title }
         audio { url mime size durationSeconds }
+      }
+    }
+  }
+`;
+
+/*
+ * The same reads for a channel the caller named: each passes the channel and asks for
+ * `channelId`, as the REST API answers a read that names a channel. A read that names none keeps
+ * the documents above, so its answer is the one from before channels.
+ */
+
+export const scheduleChannelQuery = /* GraphQL */ `
+  query SdkChannelSchedule($fromDate: String!, $throughDate: String!, $channel: String) {
+    schedule(fromDate: $fromDate, throughDate: $throughDate, channel: $channel) {
+      contractVersion
+      timezone
+      truncated
+      broadcasts { ${broadcastFields} channelId }
+    }
+  }
+`;
+
+export const showsChannelQuery = /* GraphQL */ `
+  query SdkChannelShows($fromDate: String!, $throughDate: String!, $channel: String) {
+    shows(fromDate: $fromDate, throughDate: $throughDate, channel: $channel) {
+      contractVersion
+      timezone
+      fromDate
+      throughDate
+      truncated
+      shows {
+        id
+        title
+        profileId
+        type
+        presenters { id title }
+        slots {
+          weekday
+          startTime
+          durationMinutes
+          endTime
+          timezone
+          intervalWeeks
+          fromDate
+          throughDate
+          presenters { id title }
+          channelId
+        }
+      }
+    }
+  }
+`;
+
+export const currentBroadcastChannelQuery = /* GraphQL */ `
+  query SdkChannelCurrentBroadcast($channel: String) {
+    currentBroadcast(channel: $channel) {
+      contractVersion
+      timezone
+      asOf
+      broadcast { ${broadcastFields} channelId }
+    }
+  }
+`;
+
+export const nowPlayingChannelQuery = /* GraphQL */ `
+  query SdkChannelNowPlaying($channel: String) {
+    nowPlaying(channel: $channel) {
+      contractVersion
+      stationId
+      channelId
+      timezone
+      track {
+        artist
+        title
+        album
+        durationSeconds
+        artworkUrl
+        isPlaying
+        observedAt
+        receivedAt
+      }
+      elapsedSeconds
+      endsAt
+      freshness { status thresholdSeconds ageSeconds observedAt receivedAt }
+    }
+  }
+`;
+
+export const trackHistoryChannelQuery = /* GraphQL */ `
+  query SdkChannelTrackHistory($cursor: String, $limit: Int, $channel: String) {
+    trackHistory(cursor: $cursor, limit: $limit, channel: $channel) {
+      contractVersion
+      stationId
+      items {
+        id
+        artist
+        title
+        album
+        durationSeconds
+        artworkUrl
+        isPlaying
+        observedAt
+        receivedAt
+        channelId
+      }
+      nextCursor
+    }
+  }
+`;
+
+export const onDemandChannelQuery = /* GraphQL */ `
+  query SdkChannelOnDemand($programId: ID, $cursor: String, $limit: Int, $channel: String) {
+    onDemand(programId: $programId, cursor: $cursor, limit: $limit, channel: $channel) {
+      contractVersion
+      timezone
+      nextCursor
+      items {
+        id
+        title
+        description
+        startsAt
+        endsAt
+        endTime
+        timezone
+        localDate
+        nature
+        program { id title profileId }
+        presenters { id title }
+        audio { url mime size durationSeconds }
+        channelId
       }
     }
   }

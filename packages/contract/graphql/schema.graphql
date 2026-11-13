@@ -24,18 +24,59 @@ scalar JSON
     The record a slug names; a slug it used before resolves to the record as it is now.
     """
     contentBySlug(type: String!, slug: String!): PublishedRecord
-    schedule(fromDate: String!, throughDate: String!): Schedule
     """
-    The shows on air in the window, with their regular slots.
+    The broadcasts in the window on the main channel, or on the channel that channel names.
     """
-    shows(fromDate: String!, throughDate: String!): Shows
-    currentBroadcast: CurrentBroadcast
+    schedule(
+      fromDate: String!
+      throughDate: String!
+      "The slug of a channel in station.channels, or main; the main channel without it."
+      channel: String
+    ): Schedule
     """
-    Published recordings of aired broadcasts, newest first; programId keeps one show's.
+    The shows on air in the window, with their regular slots, on the main channel or the one
+    channel names.
     """
-    onDemand(programId: ID, cursor: String, limit: Int = 25): OnDemand
-    nowPlaying: NowPlaying
-    trackHistory(cursor: String, limit: Int = 25): TrackHistory
+    shows(
+      fromDate: String!
+      throughDate: String!
+      "The slug of a channel in station.channels, or main; the main channel without it."
+      channel: String
+    ): Shows
+    """
+    The broadcast on air now on the main channel, or on the one channel names.
+    """
+    currentBroadcast(
+      "The slug of a channel in station.channels, or main; the main channel without it."
+      channel: String
+    ): CurrentBroadcast
+    """
+    Published recordings of aired broadcasts, newest first; programId keeps one show's and
+    channel one channel's.
+    """
+    onDemand(
+      programId: ID
+      cursor: String
+      limit: Int = 25
+      "The slug of a channel in station.channels, or main; the main channel without it."
+      channel: String
+    ): OnDemand
+    """
+    What plays now on the main channel, or on the one channel names.
+    """
+    nowPlaying(
+      "The slug of a channel in station.channels, or main; the main channel without it."
+      channel: String
+    ): NowPlaying
+    """
+    The tracks that played, newest first, on the main channel or the one channel names.
+    """
+    trackHistory(
+      cursor: String
+      limit: Int = 25
+      "The slug of a channel in station.channels, or main; the main channel without it."
+      channel: String
+    ): TrackHistory
     weather: Weather
     traffic: Traffic
   }
@@ -55,8 +96,47 @@ scalar JSON
     Present once the station has saved a profile.
     """
     profile: StationProfile
+    """
+    The channels listeners see: the main channel first, then every other published channel.
+    Pass a channel's slug as channel to schedule, shows, currentBroadcast, onDemand,
+    nowPlaying and trackHistory; a channel that is unknown, archived or not published answers
+    null with a NOT_FOUND error.
+    """
+    channels: [StationChannel!]!
     resources: StationResources!
     delivery: StationDelivery!
+  }
+
+  """
+  A channel listeners see. The main channel is the station itself: its id is the station's id,
+  its slug main, and its stream and frequency label the profile's.
+  """
+  type StationChannel {
+    id: ID!
+    slug: String!
+    name: String!
+    main: Boolean!
+    """
+    How listeners tune in, for example "DAB+ 11C".
+    """
+    frequencyLabel: String
+    streamUrl: String
+    "Its local editions listeners see, oldest first."
+    editions: [StationLocalEdition!]!
+  }
+
+  """
+  A local edition: a window of its channel's schedule that one area hears in place of the
+  regular broadcast.
+  """
+  type StationLocalEdition {
+    id: ID!
+    slug: String!
+    name: String!
+    "The area it serves, for example its municipalities."
+    area: String!
+    "Its own stream; null plays its channel's."
+    streamUrl: String
   }
 
   type StationProfile {
@@ -301,6 +381,8 @@ scalar JSON
     fromDate: String!
     throughDate: String!
     presenters: [BroadcastPresenter!]!
+    "The channel the slot is on: the station's id for the main channel."
+    channelId: ID!
   }
 
   type CurrentBroadcast {
@@ -313,6 +395,8 @@ scalar JSON
   type NowPlaying {
     contractVersion: Int!
     stationId: ID!
+    "The channel it plays on: the station's id for the main channel."
+    channelId: ID!
     timezone: String!
     track: PlaybackTrack
     elapsedSeconds: Int
@@ -356,6 +440,8 @@ scalar JSON
     isPlaying: Boolean!
     observedAt: String!
     receivedAt: String!
+    "The channel it played on: the station's id for the main channel."
+    channelId: ID!
   }
 
   type Broadcast {
@@ -375,6 +461,8 @@ scalar JSON
     nature: String!
     program: BroadcastProgram!
     presenters: [BroadcastPresenter!]!
+    "The channel it airs on: the station's id for the main channel."
+    channelId: ID!
   }
 
   type BroadcastProgram {
@@ -408,6 +496,8 @@ scalar JSON
     program: BroadcastProgram!
     presenters: [BroadcastPresenter!]!
     audio: OnDemandAudio!
+    "The channel it aired on: the station's id for the main channel."
+    channelId: ID!
   }
 
   type OnDemandAudio {
